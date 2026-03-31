@@ -2396,19 +2396,18 @@ svg.live-grey-icon {
 /* Le Bouclier :
    1. Si le petit côté est < 300px
    2. Si le grand côté est < 600px 
-*/
+*
 @media (max-width: 299px) and (orientation: portrait), (max-height: 299px) and (orientation: landscape), (max-height: 599px) and (orientation: portrait), (max-width: 599px) and (orientation: landscape) {
 
-    /* 🚀 MAGIE CSS : On masque absolument TOUS les enfants directs du body, SAUF l'écran de blocage */
+    /* 🚀 MAGIE CSS : On masque absolument TOUS les enfants directs du body, SAUF l'écran de blocage 
     body > *:not(#device-too-small) {
         display: none !important;
     }
 
-    /* On affiche l'écran de blocage */
     #device-too-small {
         display: flex !important;
     }
-}
+}*/
 
 
 /* ============================================================

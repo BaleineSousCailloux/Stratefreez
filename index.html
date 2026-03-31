@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STRATEFREEZ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Changa+One:ital@0;1&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="print-area"></div>
+
+    <header class="sticky-header">
+        <nav class="navbar">
+            <div class="nav-brand-container">
+                <button id="burger-btn" class="burger-btn" onclick="toggleMenu()"><span class="material-symbols-outlined">menu</span></button>
+                <div class="nav-brand" id="nav-brand-text" onclick="handleNavClick()" title="Arrêter le Chrono">STRATEFREEZ</div>
+
+                <ul class="nav-links" id="nav-links">
+                    <li><button onclick="openTab('tab-params')" class="nav-btn active">Paramètres</button></li>
+                    <li><button onclick="openTab('tab-tech')" class="nav-btn">Technique</button></li>
+                    <li><button onclick="openTab('tab-strategy')" class="nav-btn">Course</button></li>
+                    <li><button onclick="openTab('tab-live')" class="nav-btn">Live</button></li>
+                    <li><button onclick="openTab('tab-export')" class="nav-btn btn-data">Datas</button></li>
+                </ul>
+            </div>
+            <div id="save-status-badge" class="save-badge unsaved" onclick="openQuickSaveModal()" title="Sauvegarder rapidement">
+                <span class="material-symbols-outlined icon-sm">save</span> <span class="hide-on-mobile">Modifié</span>
+            </div>
+        </nav>
+        <div id="global-alert-banner" class="global-alert-banner hidden">
+            ⚠️ RÈGLES NON RESPECTÉES : <span class="text-underline-pointer" onclick="openBilanModal()">Checker règlement</span>
+        </div>
+        <div id="end-race-banner" class="end-race-banner hidden">
+            🏁 FIN DE COURSE !
+        </div>
+    </header>
+
+    <main class="container">
+
+        <section id="tab-params" class="tab-content active">
+            <div class="tab-header-flex">
+                <h2>Paramètres de l'épreuve</h2>
+                <button class="action-btn btn-grey-flex" onclick="openResetTab1Modal()">
+                    <span class="material-symbols-outlined icon-md">restart_alt</span> <span class="hide-on-mobile">Reset</span>
+                </button>
+            </div>
+
+            <form id="form-params" class="grid-form" onsubmit="return false;">
+                <fieldset>
+                    <legend>Informations de la Course</legend>
+                    <div class="multi-input-group">
+                        <div class="input-cell">
+                            <label class="sub-label">Nom de l'épreuve</label>
+                            <input type="text" id="race-name-input" placeholder="Pour la sauvegarde" oninput="syncFileName(this.value)">
+                        </div>
+                        <div class="input-cell">
+                            <label class="sub-label">Voiture</label>
+                            <input type="text" id="race-car-input" placeholder="Pour requête IA">
+                        </div>
+                        <div class="input-cell">
+                            <label class="sub-label">Circuit</label>
+                            <input type="text" id="race-track-input" placeholder="Pour requête IA">
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Équipe & Format</legend>
+                    <label for="num-drivers">Pilotes engagés</label>
+                    <input type="number" id="num-drivers" min="1" value="1" placeholder="Nombre" onchange="updateDynamicFields()">
+                    <div id="driver-names-container" class="multi-input-group mt-15">
+                        <div class="input-cell"><label class="sub-label">Pilote 1</label><input type="text" class="drv-name" id="driver-name-input-1" placeholder="Nom"></div>
+                    </div>
+                    <div id="race-type-container" class="mt-15 hidden">
+                        <label>Type de course</label>
+                        <select id="race-type" onchange="updateDynamicFields()">
+                            <option value="irl">Course IRL</option>
+                            <option value="online">Course en Ligne</option>
+                        </select>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Durée & Découpage</legend>
+                    <label>Objectif de la course</label>
+                    <select id="race-goal" onchange="toggleRaceGoal()">
+                        <option value="time">Endurance (temps)</option>
+                        <option value="laps">Nombre de tours</option>
+                    </select>
+                    <div id="goal-time-block">
+                        <label for="race-duration">Durée totale</label>
+                        <input type="text" id="race-duration" class="format-hhmm" placeholder="HH:MM" onchange="autoFillStartTimes()">
+                    </div>
+                    <div id="goal-laps-block" class="hidden">
+                        <label for="race-laps">Tours totaux</label>
+                        <input type="number" id="race-laps" min="1" placeholder="Nombre de tours" onchange="calculateSplit()">
+                    </div>
+                    <div id="splits-container" class="hidden">
+                        <label id="label-total-splits" for="total-splits">Total de splits/relais</label>
+                        <input type="number" id="total-splits" min="1" value="1" placeholder="Nombre" onchange="updateDynamicFields(); autoFillStartTimes();">
+                    </div>
+                    <div class="calculated-info hidden" id="calc-split-container">
+                        Taille d'un <span id="text-split-calc">split</span> : <span id="calc-split-duration" class="highlight-text">-</span>
+                    </div>
+                </fieldset>
+
+                <fieldset id="start-times-fieldset">
+                    <legend>Horaires de la course</legend>
+                    <div id="relay-gap-container" class="mb-15 hidden">
+                        <label>Écart inter-relais</label>
+                        <input type="number" id="relay-gap" min="0" value="0" class="w-150" placeholder="Minutes" onchange="autoFillStartTimes()">
+                    </div>
+                    <div id="start-time-container" class="multi-input-group">
+                        <div class="time-input-wrapper input-cell">
+                            <label>Heure de départ prévue</label>
+                            <input type="text" class="format-hhmm dyn-time" placeholder="HH:MM" id="start-time-1" onchange="autoFillStartTimes()">
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset id="driver-rules-block" class="hidden">
+                    <legend>Règles des Pilotes</legend>
+                    <div id="max-consecutive-container">
+                        <label>Durée d'un relais pilote</label>
+                        <input type="number" id="max-consecutive-splits" min="1" value="1" placeholder="En nombre de splits">
+                    </div>
+                    <label id="lbl-mandatory-splits">Relais obligatoires par pilote</label>
+                    <input type="number" id="mandatory-splits" min="0" value="0" placeholder="Nombre" onchange="this.dataset.touched = 'true'">
+                </fieldset>
+
+                <fieldset id="solo-race-block" class="border-success hidden">
+                    <legend class="text-success">Course Solo</legend>
+                    <p class="help-text">1 seul pilote détecté : Les règles de relais sont désactivées.</p>
+                </fieldset>
+
+                <fieldset id="pit-rules-block">
+                    <legend>Règles des Stands</legend>
+
+                    <div class="mb-15">
+                        <label class="inline-checkbox-label">
+                            <input type="checkbox" id="enable-pit-window" onchange="togglePitWindowUI()"> Activer la fenêtre de stand
+                        </label>
+                    </div>
+
+                    <div id="window-settings-area" class="tire-options hidden">
+
+                        <div id="ui-multi-window" class="multi-input-group hidden">
+                            <div class="input-cell">
+                                <label class="sub-label">Ouverture (min. AVANT fin split)</label>
+                                <input type="number" id="pit-window-open" min="0" placeholder="Ex: 5">
+                            </div>
+                            <div class="input-cell">
+                                <label class="sub-label">Fermeture (min. APRÈS fin split)</label>
+                                <input type="number" id="pit-window-close" min="0" placeholder="Ex: 5">
+                            </div>
+                        </div>
+
+                        <div id="ui-solo-window" class="hidden">
+                            <div class="mb-10">
+                                <label class="inline-checkbox-label">
+                                    <input type="checkbox" id="pit-window-mode-tours" onchange="updateSoloInputs()"> <span id="label-mode-type">Définir en Tours (au lieu de Temps)</span>
+                                </label>
+                            </div>
+
+                            <div id="pit-window-solo-time" class="multi-input-group">
+                                <div class="input-cell">
+                                    <label class="sub-label">Ouverture (Temps)</label>
+                                    <input type="text" id="time-pit-window-open" class="format-hhmm" placeholder="HH:MM">
+                                </div>
+                                <div class="input-cell">
+                                    <label class="sub-label">Fermeture (Temps)</label>
+                                    <input type="text" id="time-pit-window-close" class="format-hhmm" placeholder="HH:MM">
+                                </div>
+                            </div>
+
+                            <div id="pit-window-solo-laps" class="multi-input-group hidden">
+                                <div class="input-cell">
+                                    <label class="sub-label">Ouverture (Tour)</label>
+                                    <input type="number" id="lap-pit-window-open" min="1" placeholder="Ex: 15">
+                                </div>
+                                <div class="input-cell">
+                                    <label class="sub-label">Fermeture (Tour)</label>
+                                    <input type="number" id="lap-pit-window-close" min="1" placeholder="Ex: 25">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-15 mt-15">
+                        <label class="inline-checkbox-label"><input type="checkbox" id="pit-tires-only"> Changement de type de gomme uniquement sur fenêtre</label>
+                    </div>
+                    <div class="d-flex align-center gap-10 flex-wrap">
+                        <label id="lbl-req-pit-stops" class="mb-0">Arrêts aux stands obligatoires</label>
+                        <input type="number" id="global-req-pit-stops" min="0" max="2" value="0" class="w-50-center">
+                    </div>
+                </fieldset>
+
+                <fieldset id="global-tire-change-block">
+                    <legend>Règle de Changement de Gomme</legend>
+                    <div><label class="inline-checkbox-label"><input type="checkbox" id="global-req-tire-change"><span id="lbl-req-tire-change">Changement de type de gomme obligatoire</span></label></div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Gommes utilisables :</legend>
+                    <div class="tire-block"><label class="tire-toggle"><input type="checkbox" id="use-T" onchange="toggleTireOptions('T')"> Tendres (T)</label><div id="options-T" class="tire-options hidden"><div class="tire-condition hide-on-solo"><span><input type="checkbox" class="cond-check" id="cb-T-1" onchange="handleTireCondition(this)"> Obligation en splits/relais complets ?</span><input type="number" id="val-T-1" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-T-2" onchange="handleTireCondition(this)"> Obligation en nombre de trains ?</span><input type="number" id="val-T-2" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-T-3" onchange="handleTireCondition(this)"> Limitation en nombre max de trains ?</span><input type="number" id="val-T-3" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div></div></div>
+                    <div class="tire-block"><label class="tire-toggle"><input type="checkbox" id="use-M" onchange="toggleTireOptions('M')"> Mediums (M)</label><div id="options-M" class="tire-options hidden"><div class="tire-condition hide-on-solo"><span><input type="checkbox" class="cond-check" id="cb-M-1" onchange="handleTireCondition(this)"> Obligation en splits/relais complets ?</span><input type="number" id="val-M-1" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-M-2" onchange="handleTireCondition(this)"> Obligation en nombre de trains ?</span><input type="number" id="val-M-2" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-M-3" onchange="handleTireCondition(this)"> Limitation en nombre max de trains ?</span><input type="number" id="val-M-3" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div></div></div>
+                    <div class="tire-block"><label class="tire-toggle"><input type="checkbox" id="use-D" onchange="toggleTireOptions('D')"> Durs (D)</label><div id="options-D" class="tire-options hidden"><div class="tire-condition hide-on-solo"><span><input type="checkbox" class="cond-check" id="cb-D-1" onchange="handleTireCondition(this)"> Obligation en splits/relais complets ?</span><input type="number" id="val-D-1" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-D-2" onchange="handleTireCondition(this)"> Obligation en nombre de trains ?</span><input type="number" id="val-D-2" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-D-3" onchange="handleTireCondition(this)"> Limitation en nombre max de trains ?</span><input type="number" id="val-D-3" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div></div></div>
+                    <div class="tire-block"><label class="tire-toggle"><input type="checkbox" id="use-I" onchange="toggleTireOptions('I')"> Intermédiaires (I)</label><div id="options-I" class="tire-options hidden"><div class="tire-condition hide-on-solo"><span><input type="checkbox" class="cond-check" id="cb-I-1" onchange="handleTireCondition(this)"> Obligation en splits/relais complets ?</span><input type="number" id="val-I-1" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-I-2" onchange="handleTireCondition(this)"> Obligation en nombre de trains ?</span><input type="number" id="val-I-2" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-I-3" onchange="handleTireCondition(this)"> Limitation en nombre max de trains ?</span><input type="number" id="val-I-3" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div></div></div>
+                    <div class="tire-block"><label class="tire-toggle"><input type="checkbox" id="use-P" onchange="toggleTireOptions('P')"> Pluie (P)</label><div id="options-P" class="tire-options hidden"><div class="tire-condition hide-on-solo"><span><input type="checkbox" class="cond-check" id="cb-P-1" onchange="handleTireCondition(this)"> Obligation en splits/relais complets ?</span><input type="number" id="val-P-1" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-P-2" onchange="handleTireCondition(this)"> Obligation en nombre de trains ?</span><input type="number" id="val-P-2" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-P-3" onchange="handleTireCondition(this)"> Limitation en nombre max de trains ?</span><input type="number" id="val-P-3" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div></div></div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Règlementation Carburant</legend>
+                    <div class="multi-input-group">
+                        <div class="input-cell"><label class="sub-label">Carburant au départ</label><input type="text" id="fuel-start" class="format-liters" placeholder="Litres"></div>
+                        <div class="input-cell"><label class="sub-label">Vitesse de remplissage</label><input type="text" id="fuel-speed" class="format-lps" placeholder="L/s"></div>
+                        <div class="input-cell"><label class="sub-label">Réserve de sécurité</label><input type="text" id="fuel-reserve" class="format-liters" value="0 L" placeholder="Litres"></div>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Organisation de l'équipe</legend>
+                    <div><label class="inline-checkbox-label"><input type="checkbox" id="has-spotter" onchange="toggleSpotters()"> Présence de Spotters dédiés</label></div>
+                    <div id="spotters-config" class="spotters-config-container hidden">
+                        <label>Combien de spotters ?</label>
+                        <input type="number" id="num-spotters" min="1" value="1" placeholder="Nombre" onchange="updateSpotterNames()">
+                        <div id="spotter-names-container" class="multi-input-group mt-10">
+                            <div class="input-cell"><label class="sub-label">Spotter 1</label><input type="text" class="spotter-name" id="spotter-name-input-1" placeholder="Nom"></div>
+                        </div>
+                    </div>
+                </fieldset>
+            </form>
+        </section>
+
+        <section id="tab-tech" class="tab-content hidden">
+            <div class="tab-header-flex">
+                <h2>Paramètres Techniques</h2>
+                <button class="action-btn btn-grey-flex" onclick="openResetTab2Modal()">
+                    <span class="material-symbols-outlined icon-md">restart_alt</span> <span class="hide-on-mobile">Reset</span>
+                </button>
+            </div>
+
+            <form id="form-tech" class="grid-form" onsubmit="return false;">
+                <fieldset>
+                    <legend>Performances des Pneumatiques</legend>
+                    <p class="help-text">Saisissez les chronos moyens</p>
+                    <div id="tech-global-tires">
+                        <div id="no-tire-warning" class="help-text text-danger">⚠️ Aucune gomme sélectionnée (Onglet 1).</div>
+
+                        <div id="global-tire-T" class="multi-input-group tire-row hidden"><div class="tire-label"><strong>Tendres (T)</strong></div><div class="input-cell"><label class="sub-label">Chrono ATTACK</label><input type="text" id="global-time-push-T" class="format-mss000 sync-global-time-push" data-tire="T" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Chrono ÉCO</label><input type="text" id="global-time-eco-T" class="format-mss000 sync-global-time-eco" data-tire="T" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Durée de vie</label><input type="number" id="global-life-T" class="sync-global-life global-tire-life" data-tire="T" placeholder="Nb Tours"></div></div>
+                        <div id="global-tire-M" class="multi-input-group tire-row hidden"><div class="tire-label"><strong>Mediums (M)</strong></div><div class="input-cell"><label class="sub-label">Chrono ATTACK</label><input type="text" id="global-time-push-M" class="format-mss000 sync-global-time-push" data-tire="M" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Chrono ÉCO</label><input type="text" id="global-time-eco-M" class="format-mss000 sync-global-time-eco" data-tire="M" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Durée de vie</label><input type="number" id="global-life-M" class="sync-global-life global-tire-life" data-tire="M" placeholder="Nb Tours"></div></div>
+                        <div id="global-tire-D" class="multi-input-group tire-row hidden"><div class="tire-label"><strong>Durs (D)</strong></div><div class="input-cell"><label class="sub-label">Chrono ATTACK</label><input type="text" id="global-time-push-D" class="format-mss000 sync-global-time-push" data-tire="D" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Chrono ÉCO</label><input type="text" id="global-time-eco-D" class="format-mss000 sync-global-time-eco" data-tire="D" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Durée de vie</label><input type="number" id="global-life-D" class="sync-global-life global-tire-life" data-tire="D" placeholder="Nb Tours"></div></div>
+                        <div id="global-tire-I" class="multi-input-group tire-row hidden"><div class="tire-label"><strong>Inter. (I)</strong></div><div class="input-cell"><label class="sub-label">Chrono ATTACK</label><input type="text" id="global-time-push-I" class="format-mss000 sync-global-time-push" data-tire="I" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Chrono ÉCO</label><input type="text" id="global-time-eco-I" class="format-mss000 sync-global-time-eco" data-tire="I" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Durée de vie</label><input type="number" id="global-life-I" class="sync-global-life global-tire-life" data-tire="I" placeholder="Nb Tours"></div></div>
+                        <div id="global-tire-P" class="multi-input-group tire-row hidden"><div class="tire-label"><strong>Pluie (P)</strong></div><div class="input-cell"><label class="sub-label">Chrono ATTACK</label><input type="text" id="global-time-push-P" class="format-mss000 sync-global-time-push" data-tire="P" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Chrono ÉCO</label><input type="text" id="global-time-eco-P" class="format-mss000 sync-global-time-eco" data-tire="P" placeholder="MM:SS.000"></div><div class="input-cell"><label class="sub-label">Durée de vie</label><input type="number" id="global-life-P" class="sync-global-life global-tire-life" data-tire="P" placeholder="Nb Tours"></div></div>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Performances Carburant</legend>
+                    <div class="multi-input-group">
+                        <div class="input-cell"><label class="sub-label">Mode Éco</label><input type="text" id="cons-eco" class="format-lpt sync-global-fuel" data-fuel="eco" placeholder="L/t"></div>
+                        <div class="input-cell required-cell"><label class="sub-label required-label">Mode Attack *</label><input type="text" id="cons-push" class="format-lpt sync-global-fuel required-input" data-fuel="push" placeholder="L/t"></div>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Informations PIT</legend>
+                    <div class="multi-input-group">
+                        <div class="input-cell"><label class="sub-label">Trajet Stand (sans pneus)</label><input type="text" id="pit-loss-time" class="format-sec" placeholder="Secondes"></div>
+                        <div class="input-cell"><label class="sub-label">Temps changement Pneus</label><input type="text" id="pit-tire-time" class="format-sec" value="6 s" placeholder="Secondes"></div>
+                    </div>
+                </fieldset>
+
+                <fieldset id="personalize-drivers-block" class="hidden">
+                    <legend>Personnalisation des Pilotes</legend>
+                    <div><label class="inline-checkbox-label"><input type="checkbox" id="personalize-drivers-toggle" onchange="toggleDriverPersonalization()"> Personnaliser individuellement</label></div>
+                </fieldset>
+
+                <fieldset id="drivers-tech-fieldset" class="hidden">
+                    <legend>Profils Individuels</legend>
+                    <div id="drivers-tech-container"></div>
+                </fieldset>
+
+            </form>
+        </section>
+
+        <section id="tab-strategy" class="tab-content hidden">
+            <div class="tab-header-flex">
+                <h2>Suivi de course</h2>
+                <div class="d-flex gap-10">
+                    <button id="btn-check-rules" class="action-btn mr-8 btn-success" onclick="openBilanModal()">📋 Check</button>
+                    <button id="btn-clear-strategy" class="action-btn btn-grey-flex" onclick="openClearModal()">
+                        <span class="material-symbols-outlined icon-md">auto_awesome</span> <span class="hide-on-mobile">Remplissage Auto</span>
+                    </button>
+                    <button id="btn-restart-race" class="action-btn btn-warning-flex ml-8 hidden" onclick="openRestartModal()">
+                        <span class="material-symbols-outlined icon-md">fast_rewind</span> <span class="hide-on-mobile">Race Reset</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="strategy-blocks-container"></div>
+
+            <div id="global-team-validation" class="global-team-validation hidden">
+                <h3 class="modal-title-red">Validation Globale</h3>
+                <p id="global-team-text" class="validation-text">Calcul...</p>
+            </div>
+            <div id="portrait-overlay" class="portrait-overlay">
+                MODE PAYSAGE<br>OBLIGATOIRE
+            </div>
+        </section>
+
+        <section id="tab-live" class="tab-content hidden">
+
+            <div id="live-offline-msg" class="live-offline-msg">
+                <span class="material-symbols-outlined icon-huge-grey">timer_off</span>
+                <h2 class="text-huge-spaced">HORS LIGNE</h2>
+                <p class="help-text fs-1-2">Veuillez lancer un chronomètre "START" depuis l'onglet Course pour activer le Live Spotter.</p>
+            </div>
+
+            <div id="live-dashboard" class="live-dashboard-grid hidden">
+
+                <div class="live-card border-top-primary">
+                    <h3 class="live-card-title">EN PISTE</h3>
+                    <div class="live-card-content">
+                        <div class="live-top-sec">
+                            <div class="live-driver-name" id="live-driver">Pilote</div>
+                        </div>
+                        <div class="live-mid-sec">
+                            <svg class="live-grey-icon mr-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <rect x="6.5" y="2" width="11" height="20" rx="3" stroke-width="2"></rect>
+                                <line x1="9.5" y1="2" x2="9.5" y2="22" stroke-width="1"></line>
+                                <line x1="12" y1="2" x2="12" y2="22" stroke-width="1"></line>
+                                <line x1="14.5" y1="2" x2="14.5" y2="22" stroke-width="1"></line>
+                            </svg>
+                            <span id="live-tire" class="flex-center"></span>
+
+                            <span class="material-symbols-outlined live-grey-icon ml-15">local_gas_station</span>
+                            <span id="live-fuel-strat">0.0 L/t</span>
+                        </div>
+                        <div class="live-bot-sec">
+                            <div class="live-lap-counter">
+                                <span>Tour estimé :</span>
+                                <span id="live-current-lap" class="live-giant-number text-white">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="live-card border-top-warning">
+                    <h3 class="live-card-title text-warning">OBJECTIF</h3>
+                    <div class="live-card-content">
+                        <div class="live-top-sec">
+                            <div class="flex-column align-center w-100">
+                                <div id="live-current-stint-laps" class="fs-1-2 font-weight-bold mb-5">- tours</div>
+                                <div class="text-subtitle" id="live-target-text-container">Tour d'arrêt prévu :</div>
+                            </div>
+                        </div>
+                        <div class="live-mid-sec">
+                            <strong id="live-target-lap" class="text-crimson target-val">0</strong>
+                            <span class="fs-1-2 mx-5">à</span>
+                            <strong id="live-target-time" class="target-val">00:00:00</strong>
+                        </div>
+                        <div class="live-bot-sec">
+                            <div class="live-countdown" id="live-countdown">- 00:00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="live-card border-top-blue" id="live-next-box">
+                    <h3 class="live-card-title text-blue">CONSIGNES PIT</h3>
+                    <div class="live-card-content">
+                        <div class="live-top-sec">
+                            <div id="live-next-driver-container">
+                                <span class="material-symbols-outlined live-grey-icon">arrow_forward</span><span id="live-next-driver" class="live-next-driver">Pilote</span>
+                            </div>
+                        </div>
+                        <div class="live-mid-sec">
+                            <svg class="live-grey-icon mr-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <rect x="6.5" y="2" width="11" height="20" rx="3" stroke-width="2"></rect>
+                                <line x1="9.5" y1="2" x2="9.5" y2="22" stroke-width="1"></line>
+                                <line x1="12" y1="2" x2="12" y2="22" stroke-width="1"></line>
+                                <line x1="14.5" y1="2" x2="14.5" y2="22" stroke-width="1"></line>
+                            </svg>
+                            <span id="live-next-tire-container" class="flex-center"></span>
+                            <span class="material-symbols-outlined live-grey-icon ml-15">local_gas_station</span>
+                            <strong id="live-next-fuel" class="fuel-highlight">Essence</strong>
+                        </div>
+                        <div class="live-bot-sec">
+                            <div class="pit-time-container" id="live-next-pit-time-container">Durée PIT : <strong id="live-next-pit-time" class="text-white fs-1-5 ml-15">0s</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="live-card border-top-success hidden" id="live-finish-box">
+                    <h3 class="live-card-title text-success">FIN DE COURSE</h3>
+                    <div class="live-card-content">
+                        <p class="finish-msg">Dernier stint</p>
+                    </div>
+                </div>
+
+                <div class="live-action-area">
+                    <button class="live-giant-btn" id="live-btn-pitin">
+                        <span class="material-symbols-outlined icon-xl mr-15">flag</span> PIT IN
+                    </button>
+                </div>
+            </div>
+            <div id="landscape-overlay" class="landscape-overlay">
+                MODE PORTRAIT<br>OBLIGATOIRE
+            </div>
+        </section>
+
+        <section id="tab-export" class="tab-content hidden">
+            <h2>Datas & Planning</h2>
+            <p class="help-text">Gérez vos fichiers et générez vos documents.</p>
+
+            <div class="datas-zone">
+                <h3 class="section-title">💾 GESTION DE LA SESSION</h3>
+                <div class="d-flex gap-20 flex-wrap mt-20">
+
+                    <div class="export-card border-danger flex-1 min-w-300">
+                        <h3 class="text-danger"><span class="material-symbols-outlined icon-align-middle fs-1-2">save</span> Sauvegarder session</h3>
+                        <input type="text" id="save-config-name" class="export-input mh-40" placeholder="Nom du fichier (Ex: Nurb_24h)" oninput="syncFileName(this.value)">
+                        <button class="action-btn magic-btn w-100 mh-40 mt-auto" onclick="executeSave()">Télécharger .JSON</button>
+                    </div>
+
+                    <div class="export-card bg-success-light border-success flex-1 min-w-300">
+                        <h3 class="text-success"><span class="material-symbols-outlined icon-align-middle fs-1-2">folder_open</span> Charger session</h3>
+                        <input type="file" id="import-config-file" accept=".json" class="hidden" onchange="loadConfig(event)">
+                        <button class="action-btn btn-import w-100 mh-40 mt-auto " onclick="document.getElementById('import-config-file').click()">Importer un .JSON</button>
+                    </div>
+
+                </div>
+
+                <h3 class="section-title-grey mt-25">🛠️ OUTILS & EXPORTS</h3>
+                <div class="d-flex gap-20 flex-wrap mt-20">
+
+                    <div class="export-card flex-1 min-w-250">
+                        <h3>🖨️ Suivi de course</h3>
+                        <button id="btn-export-print" class="action-btn btn-print mh-40 mt-auto" onclick="printStrategy()">
+                            <span class="lock-icon hidden"><span class="material-symbols-outlined icon-sm icon-align-middle">lock</span> </span>Imprimer
+                        </button>
+                    </div>
+
+                    <div class="export-card flex-1 min-w-250">
+                        <h3>📅 Planning Équipe</h3>
+                        <button id="btn-export-csv" class="action-btn btn-export-csv mh-40 mt-auto" onclick="downloadPlanningCSV()">
+                            <span class="lock-icon hidden"><span class="material-symbols-outlined icon-sm icon-align-middle">lock</span> </span>Générer CSV
+                        </button>
+                    </div>
+
+                    <div class="export-card w-100 border-blue mt-5">
+                        <h3 class="text-blue">🤖 Requête IA</h3>
+                        <textarea id="ia-prompt-preview" readonly class="ia-textarea"></textarea>
+                        <div class="d-flex gap-10 w-100">
+                            <button id="btn-export-copy" class="action-btn btn-copy mh-40" onclick="copyIARequest()">
+                                <span class="lock-icon hidden"><span class="material-symbols-outlined icon-sm icon-align-middle">lock</span> </span>Copier
+                            </button>
+                            <button id="btn-export-json" class="action-btn btn-txt mh-40" onclick="downloadIAJson()">
+                                <span class="lock-icon hidden"><span class="material-symbols-outlined icon-sm icon-align-middle">lock</span> </span>.TXT
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <button id="fab-top" class="fab-top hidden" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Retour en haut">
+        <span class="material-symbols-outlined">arrow_upward</span>
+    </button>
+
+    <div id="quick-save-modal" class="modal hidden"><div class="modal-content border-top-danger"><h3 class="modal-title-red">💾 SAUVEGARDER</h3><input type="text" id="quick-save-name" placeholder="Ex: Nurb_24h" class="modal-input-text" oninput="syncFileName(this.value)" onkeydown="if(event.key==='Enter'){confirmQuickSave();}"><div class="modal-btn-group"><button class="action-btn btn-grey" onclick="closeQuickSaveModal()">Annuler</button><button class="action-btn magic-btn" onclick="confirmQuickSave()">SAUVEGARDER</button></div></div></div>
+    <div id="reset-tab1-modal" class="modal hidden"><div class="modal-content border-top-danger"><h3 class="modal-title-red">⚠️ RESET PARAMÈTRES</h3><div class="modal-btn-group mt-20"><button class="action-btn btn-grey" onclick="closeResetTab1Modal()">Annuler</button><button class="action-btn btn-danger" onclick="confirmResetTab1()">VIDER</button></div></div></div>
+    <div id="reset-tab2-modal" class="modal hidden"><div class="modal-content border-top-danger"><h3 class="modal-title-red">⚠️ RESET TECHNIQUE</h3><div class="modal-btn-group mt-20"><button class="action-btn btn-grey" onclick="closeResetTab2Modal()">Annuler</button><button class="action-btn btn-danger" onclick="confirmResetTab2()">VIDER</button></div></div></div>
+    <div id="stop-timer-modal" class="modal hidden"><div class="modal-content border-top-danger"><h3 class="modal-title-red">⏹️ ARRÊTER LE CHRONO ?</h3><input type="text" id="stop-timer-input" placeholder="Tapez STOP" class="modal-input-stop" oninput="checkStopTimerInput()" onkeydown="if(event.key==='Enter' && !document.getElementById('btn-confirm-stop').disabled){confirmStopTimer();}"><div class="modal-btn-group"><button class="action-btn btn-grey" onclick="closeStopTimerModal()">Annuler</button><button class="action-btn btn-danger btn-disabled" id="btn-confirm-stop" onclick="confirmStopTimer()" disabled>STOP</button></div></div></div>
+    <div id="pit-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 class="modal-title-red">🔴 PIT IN CONFIRMATION</h3>
+            <p>Confirmez le tour d'arrêt</p>
+            <p>La validation fixera l'heure d'arrêt</p>
+            <p id="modal-force-pit-text" class="text-amber fs-09 hidden">Forcer Auto-PIT = Valider le prévisionnel</p>
+
+            <input type="number" id="pit-modal-lap" class="modal-input-large" onkeydown="if(event.key==='Enter'){confirmPitIn();}">
+
+            <div class="modal-triple-buttons-container">
+
+                <button class="triple-btn btn-grey" onclick="closePitModal()">
+                    Annuler
+                </button>
+
+                <button id="modal-btn-force-pit" class="triple-btn btn-amber hidden" onclick="confirmForceAutoPit()">
+                    <div class="force-btn-content">
+                        <div class="force-btn-line1">
+                            <span class="material-symbols-outlined icon-sm">settings_backup_restore</span> Forcer
+                        </div>
+                        <div class="force-btn-line2">Auto-PIT</div>
+                    </div>
+                </button>
+
+                <button class="triple-btn magic-btn" onclick="confirmPitIn()">
+                    VALIDER
+                </button>
+            </div>
+
+        </div>
+    </div>
+    <div id="undo-pit-modal" class="modal hidden"><div class="modal-content border-top-success"><h3 class="modal-title-green">⏪ ANNULER LE PIT IN</h3><p>Combien de tours aviez-vous prévu de faire initialement ?</p><input type="number" id="undo-pit-modal-lap" class="modal-input-large" onkeydown="if(event.key==='Enter'){confirmUndoPit();}"><div class="justify-space-around d-flex"><button class="action-btn btn-grey" onclick="closeUndoPitModal()">Annuler</button><button class="action-btn btn-success" onclick="confirmUndoPit()">DÉVERROUILLER</button></div></div></div>
+    <div id="fuel-modal" class="modal hidden"><div class="modal-content border-top-warning"><h3>⛽ MODIFIER LE CARBURANT</h3><p class="mb-5">Calculé : <strong id="fuel-modal-calc" class="text-success fs-1-2"></strong> L</p><input type="number" id="fuel-modal-input" step="0.1" class="modal-input-fuel" onkeydown="if(event.key==='Enter'){confirmFuelOverride();}"><div class="modal-btn-group mt-25"><button class="action-btn btn-grey" onclick="clearFuelOverride()">Auto</button><button class="action-btn btn-warning" onclick="confirmFuelOverride()">VALIDER</button></div></div></div>
+    <div id="delete-modal" class="modal hidden"><div class="modal-content border-top-danger"><p class="modal-confirm-text">Supprimer cette ligne ?</p><div class="modal-btn-group mt-20"><button class="action-btn btn-grey" onclick="closeDeleteModal()">Annuler</button><button class="action-btn btn-danger" onclick="confirmDeleteRow()">SUPPRIMER</button></div></div></div>
+    <div id="clear-modal" class="modal hidden"><div class="modal-content border-top-danger"><p class="modal-confirm-text">🗑️ Vider le tableau</p><div class="modal-btn-group mt-20"><button class="action-btn btn-grey" onclick="closeClearModal()">Annuler</button><button class="action-btn btn-danger" onclick="confirmClearStrategy()">CONFIRMER</button></div></div></div>
+    <div id="bilan-modal" class="modal hidden"><div class="modal-content border-top-success modal-wide"><p class="modal-confirm-text">📋 CHECK RÉGLEMENTATION</p><div id="bilan-content" class="bilan-content-box"></div><div class="d-flex justify-center mt-20"><button class="action-btn btn-grey" onclick="closeBilanModal()">Fermer</button></div></div></div>
+    <div id="export-error-modal" class="modal hidden"><div class="modal-content border-top-danger"><h3 class="modal-title-red">❌ EXPORT IMPOSSIBLE</h3><p class="help-text">Veuillez corriger les alertes en rouge dans le suivi de course avant d'exporter.</p><div class="d-flex justify-center mt-20"><button class="action-btn btn-danger w-120" onclick="closeExportErrorModal()">Compris</button></div></div></div>
+    <div id="excess-stint-modal" class="modal hidden">
+        <div class="modal-content border-top-danger modal-wide">
+            <h3 class="modal-title-red">⚠️ ACTION IMPOSSIBLE</h3>
+            <p id="excess-stint-msg" class="modal-confirm-text mt-15 mb-20">
+                Capacité maximale des gommes atteinte.
+            </p>
+            <div class="justify-center d-flex mt-20">
+                <button class="action-btn btn-danger w-120" onclick="closeExcessModal()">Compris</button>
+            </div>
+        </div>
+    </div>
+    <div id="restart-modal" class="modal hidden">
+        <div class="modal-content border-top-warning modal-wide">
+            <h3 class="modal-title-red" style="color: #ffb74d;">⚠️ RELANCER LA COURSE</h3>
+            <p class="modal-confirm-text mt-15 mb-20" style="font-weight: normal;">
+                Voulez-vous relancer la course ?<br><br>
+                Cela déverrouillera tous les relais et supprimera les ajustements manuels d'essence, mais conservera votre stratégie de gommes.
+            </p>
+            <div class="justify-space-around d-flex">
+                <button class="action-btn btn-grey" onclick="closeRestartModal()">Annuler</button>
+                <button class="action-btn btn-warning" onclick="confirmRestartRace()">RELANCER</button>
+            </div>
+        </div>
+    </div>
+    <div id="device-too-small">
+        VOTRE APPAREIL EST TROP PETIT<br>POUR CETTE APPLICATION
+    </div>
+
+    <script src="prompt.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

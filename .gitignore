@@ -1,0 +1,8 @@
+# Dossiers Visual Studio
+.vs/
+*.slnx
+*.vsidx
+
+# Autres fichiers temporaires
+*.log
+.DS_Store

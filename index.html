@@ -542,7 +542,27 @@
     <div id="device-too-small">
         VOTRE APPAREIL EST TROP PETIT<br>POUR CETTE APPLICATION
     </div>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC6jXeNtv0wyNTKsCrPqNCybuXfcixtq88",
+            authDomain: "stratefreez.firebaseapp.com",
+            projectId: "stratefreez",
+            storageBucket: "stratefreez.firebasestorage.app",
+            messagingSenderId: "691434727926",
+            appId: "1:691434727926:web:5abff0c0be2bed03e4bfd7"
+        };
 
+        // On allume le moteur Firebase
+        firebase.initializeApp(firebaseConfig);
+
+        // On connecte la base de données (Firestore) et on la rend globale
+        const db = firebase.firestore();
+
+        console.log("🔥 Connexion au Cerveau Cloud Firebase réussie !");
+    </script>
     <script src="prompt.js"></script>
     <script src="app.js"></script>
 </body>

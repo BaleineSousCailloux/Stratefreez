@@ -101,7 +101,7 @@ document.addEventListener('click', function (e) {
 // ==========================================
 // --- SAUVEGARDE & STATUS ---
 // ==========================================
-function setSaveBadge(isSaved) {
+/*function setSaveBadge(isSaved) {
     const badge = document.getElementById('save-status-badge');
     if (!badge) return;
     if (isSaved) {
@@ -113,7 +113,7 @@ function setSaveBadge(isSaved) {
         badge.classList.add('unsaved');
         badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
     }
-}
+}*/
 
 function saveFormState() {
     if (window.isInitializingDOM) return;
@@ -126,7 +126,7 @@ function saveFormState() {
     });
     localStorage.setItem('stratefreez-form-state', JSON.stringify(state));
     localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
-    setSaveBadge(false);
+    /*setSaveBadge(false);*/
 
     // 🚀 NOUVEAU : On délègue à l'amortisseur Cloud
     triggerCloudSync();
@@ -326,7 +326,7 @@ function executeSave() {
     a.href = URL.createObjectURL(blob);
     a.download = `${name}.json`;
     a.click();
-    setSaveBadge(true);
+    /*setSaveBadge(true);*/
 }
 
 // 🚀 AXE 2 : Fonction de Duplication
@@ -422,7 +422,7 @@ function loadConfig(event) {
                 // Cela mettra aussi à jour instantanément la ligne verte si le chrono est lancé !
                 renderStrategy();
 
-                setSaveBadge(true);
+                /*setSaveBadge(true);*/
                 openTab('tab-strategy');
 
             } else {
@@ -654,7 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let savedTab = localStorage.getItem('stratefreez-current-tab') || 'tab-strategy';
         if (savedTab === 'tab-params' || savedTab === 'tab-tech') savedTab = 'tab-strategy';
         openTab(savedTab);
-        setSaveBadge(false);
+        /*setSaveBadge(false);*/
 
     } else {
         // --- CAS B : NOUVELLE SESSION (Course vierge ou terminée) ---

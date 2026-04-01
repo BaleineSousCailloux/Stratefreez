@@ -507,7 +507,7 @@ let pendingSwitchRaceId = null;
 let unsubscribeCloud = null;
 
 // 🚀 NOUVELLES VARIABLES SÉCURITÉ & RÉSEAU
-let isEngineerMode = localStorage.getItem('stratefreez-is-engineer') === 'true';
+let isEngineerMode = false; // Sera défini dynamiquement selon la course
 let cloudSyncTimeout = null; // L'amortisseur de requêtes Firebase
 
 // ==========================================
@@ -578,7 +578,7 @@ function confirmPinAuth() {
     let input = document.getElementById('pin-auth-input').value.trim();
     if (input === currentRacePin) {
         isEngineerMode = true;
-        localStorage.setItem('stratefreez-is-engineer', 'true');
+        localStorage.setItem(`stratefreez-is-engineer-${currentRaceId}`, 'true');
         toggleObserverMode(false);
         closePinAuthModal();
     } else {
@@ -624,6 +624,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePinDisplay();
         updateSnapshotDropdown();
         listenToCloudRace(); // 🚀 AJOUT ICI : Relance l'écoute après un F5
+
+        // 🚀 CAHIER DES CHARGES : Vérification des droits pour cette course précise
+        isEngineerMode = localStorage.getItem(`stratefreez-is-engineer-${currentRaceId}`) === 'true';
+        toggleObserverMode(!isEngineerMode);
 
         // Focus intelligent : On force l'onglet 3 si on était sur les paramétrages au moment du crash
         let savedTab = localStorage.getItem('stratefreez-current-tab') || 'tab-strategy';
@@ -676,6 +680,9 @@ function clearCurrentRaceData() {
     updateSnapshotDropdown();
     // 🚀 AJOUT ICI : On coupe l'écoute du cloud si on vide la course
     if (unsubscribeCloud) { unsubscribeCloud(); unsubscribeCloud = null; }
+    // On déverrouille l'UI par défaut pour la page d'accueil
+    isEngineerMode = true;
+    toggleObserverMode(false);
 }
 
 function openNewRaceModal() {
@@ -700,13 +707,13 @@ function confirmNewRace() {
     currentRacePin = Math.floor(1000 + Math.random() * 9000).toString();
     isRaceActive = true;
 
-    // 🚀 AXE 2 : Le créateur est automatiquement Ingénieur
-    isEngineerMode = true;
-
     localStorage.setItem('stratefreez-current-race-id', currentRaceId);
     localStorage.setItem('stratefreez-current-race-pin', currentRacePin);
     localStorage.setItem('stratefreez-is-race-active', 'true');
-    localStorage.setItem('stratefreez-is-engineer', 'true');
+
+    // 🚀 CAHIER DES CHARGES : Le créateur est automatiquement Ingénieur pour CETTE course
+    isEngineerMode = true;
+    localStorage.setItem(`stratefreez-is-engineer-${currentRaceId}`, 'true');
 
     // Création initiale pure dans Firebase
     db.collection('races').doc(currentRaceId).set({
@@ -840,7 +847,6 @@ function cancelSwitchRace() {
 let unsubscribeCloud = null;
 
 async function confirmSwitchRace() {
-    isEngineerMode = false; localStorage.setItem('stratefreez-is-engineer', 'false'); toggleObserverMode(true);
     if (!pendingSwitchRaceId) return;
 
     document.getElementById('switch-race-modal').classList.add('hidden');
@@ -851,6 +857,10 @@ async function confirmSwitchRace() {
     // 2. On configure les identifiants
     currentRaceId = pendingSwitchRaceId;
     localStorage.setItem('stratefreez-current-race-id', currentRaceId);
+
+    // 🚀 CAHIER DES CHARGES : On vérifie si l'appareil a DÉJÀ les droits d'Ingénieur pour CETTE course
+    isEngineerMode = localStorage.getItem(`stratefreez-is-engineer-${currentRaceId}`) === 'true';
+    toggleObserverMode(!isEngineerMode);
 
     // 3. TÉLÉCHARGEMENT INITIAL DEPUIS LE CLOUD
     try {

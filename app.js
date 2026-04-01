@@ -4529,3 +4529,4 @@ function restoreSnapshot(idx) {
     document.getElementById('snapshot-select').value = ""; // Reset du select
     openTab('tab-strategy'); // On bascule sur la stratégie pour voir le résultat
 }
+// Assurez-vous qu'il n'y a absolument aucun autre caractère ou accolade après cette ligne.

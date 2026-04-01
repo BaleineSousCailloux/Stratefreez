@@ -146,18 +146,32 @@ body {
     background-color: #0d47a1;
 }
 
+/* Espacement forcé pour les boutons Créer/Rejoindre */
+#race-selection-block {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px !important;
+}
+
+/* Débridage de la largeur pour le menu de sélection de course */
+#join-race-select {
+    max-width: none !important;
+    min-width: 200px !important;
+}
+
 .save-badge {
-    padding: 6px 14px;
+    padding: 8px;
+    width: 38px;
+    height: 38px;
     border-radius: 4px;
-    font-weight: bold;
-    font-size: 0.9em;
     transition: all 0.3s;
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     border: 1px solid transparent;
+    box-sizing: border-box;
 }
 
     .save-badge.unsaved {
@@ -1703,6 +1717,10 @@ select:disabled, input:disabled, .locked-sim {
     min-width: 250px;
 }
 
+.min-w-200 {
+    min-width: 200px;
+}
+
 .mh-40 {
     min-height: 40px;
 }
@@ -1753,6 +1771,14 @@ select:disabled, input:disabled, .locked-sim {
 
 .inline-block {
     display: inline-block;
+}
+
+.block {
+    display: block;
+}
+
+.text-right {
+    text-align: right;
 }
 
 .cursor-pointer {

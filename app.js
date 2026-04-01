@@ -65,6 +65,17 @@ document.addEventListener('change', function (e) {
 });
 
 document.addEventListener('click', function (e) {
+    // 🚀 AXE 1 : Fermeture du menu "Rejoindre" au clic extérieur
+    const joinContainer = document.getElementById('join-race-container');
+    const joinSelect = document.getElementById('join-race-select');
+    const joinBtn = document.getElementById('btn-show-join');
+    if (joinContainer && !joinContainer.contains(e.target)) {
+        if (joinSelect && !joinSelect.classList.contains('hidden')) {
+            joinSelect.classList.add('hidden');
+            joinBtn.classList.remove('hidden');
+            joinSelect.value = "";
+        }
+    }
     let tr = e.target.closest('tr[data-stint]');
     if (tr && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
         document.querySelectorAll('.active-stint').forEach(el => el.classList.remove('active-stint'));
@@ -96,11 +107,11 @@ function setSaveBadge(isSaved) {
     if (isSaved) {
         badge.classList.remove('unsaved');
         badge.classList.add('saved');
-        badge.innerHTML = '<span class="material-symbols-outlined icon-sm">check_circle</span> <span class="hide-on-mobile">Sauvegardé</span>';
+        badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock</span>';
     } else {
         badge.classList.remove('saved');
         badge.classList.add('unsaved');
-        badge.innerHTML = '<span class="material-symbols-outlined icon-sm">save</span> <span class="hide-on-mobile">Modifié</span>';
+        badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
     }
 }
 
@@ -116,6 +127,24 @@ function saveFormState() {
     localStorage.setItem('stratefreez-form-state', JSON.stringify(state));
     localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
     setSaveBadge(false);
+
+    // 🚀 ÉTAPE 1 : SYNCHRONISATION FIREBASE (CLOUD)
+    if (currentRaceId && isRaceActive) {
+        // On vérifie si le chrono tourne pour la catégorisation
+        let timerStr = localStorage.getItem('stratefreez-timer');
+        let isTimerRunning = timerStr ? JSON.parse(timerStr).active : false;
+
+        db.collection('races').doc(currentRaceId).set({
+            id: currentRaceId,
+            pin: currentRacePin,
+            name: state['race-name-input'] || 'Course sans nom',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            isActive: true,
+            isTimerRunning: isTimerRunning, // 🚀 L'INFO VITALE POUR LE TRI
+            formState: state,
+            strategyData: strategySplits
+        }).catch(err => console.error("Erreur de synchro Cloud :", err));
+    }
 }
 
 let globalSaveTimeout = null;
@@ -282,7 +311,6 @@ function syncFileName(val) {
 }
 
 function openQuickSaveModal() {
-    if (!checkExportSecurity()) return; // 🚀 NOUVEAU : Cadenas de sécurité
     let modalInp = document.getElementById('quick-save-name');
     if (modalInp) modalInp.value = currentFileName;
     document.getElementById('quick-save-modal').classList.remove('hidden');
@@ -295,7 +323,6 @@ function confirmQuickSave() {
 }
 
 function executeSave() {
-    if (!checkExportSecurity()) return; // 🚀 NOUVEAU : Cadenas de sécurité
     let name = currentFileName.trim();
 
     if (!name) {
@@ -317,6 +344,38 @@ function executeSave() {
     a.download = `${name}.json`;
     a.click();
     setSaveBadge(true);
+}
+
+// 🚀 AXE 2 : Fonction de Duplication
+function openDuplicateErrorModal() { document.getElementById('duplicate-error-modal').classList.remove('hidden'); }
+function closeDuplicateErrorModal() { document.getElementById('duplicate-error-modal').classList.add('hidden'); }
+
+function duplicateRace() {
+    let name = document.getElementById('save-config-name').value.trim();
+    let currentName = document.getElementById('race-name-input').value.trim();
+
+    // Vérifie si vide OU si identique au nom actuel
+    if (!name || name === currentName) {
+        openDuplicateErrorModal();
+        return;
+    }
+
+    let stateStr = localStorage.getItem('stratefreez-form-state');
+    let stratStr = localStorage.getItem('stratefreez-data');
+    let config = {
+        formState: stateStr ? JSON.parse(stateStr) : {},
+        strategyData: stratStr ? JSON.parse(stratStr) : []
+    };
+
+    if (config.formState['race-name-input']) config.formState['race-name-input'] = name;
+
+    let blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${name}.json`;
+    a.click();
+
+    document.getElementById('save-config-name').value = '';
 }
 
 function loadConfig(event) {
@@ -456,35 +515,246 @@ function applyFormStateToDOM(state) {
 }
 
 // ==========================================
-// --- INITIALISATION (F5) ---
+// --- NOUVELLES VARIABLES GLOBALES (AXE 1) ---
+// ==========================================
+let currentRaceId = localStorage.getItem('stratefreez-current-race-id') || null;
+let currentRacePin = localStorage.getItem('stratefreez-current-race-pin') || null;
+let isRaceActive = localStorage.getItem('stratefreez-is-race-active') === 'true';
+let pendingSwitchRaceId = null;
+
+// ==========================================
+// --- INITIALISATION INTELLIGENTE (F5) ---
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    const stateStr = localStorage.getItem('stratefreez-form-state');
-    if (stateStr) {
-        let parsedState = JSON.parse(stateStr);
-        applyFormStateToDOM(parsedState);
-        // 🚀 On synchronise le nom de sauvegarde si on a restauré la page (F5)
-        if (parsedState['race-name-input']) {
-            syncFileName(parsedState['race-name-input']);
-        }
-    } else {
-        updateDynamicFields();
-    }
-
     bindGlobalSyncEvents();
 
-    const stratData = localStorage.getItem('stratefreez-data');
-    if (stratData) strategySplits = JSON.parse(stratData);
+    let timerStr = localStorage.getItem('stratefreez-timer');
+    let isTimerRunning = timerStr ? JSON.parse(timerStr).active : false;
 
-    cascadeFixPitWindows();
+    // La course est "en cours" si elle n'a pas été finie OU si le chrono tourne
+    let shouldResumeRace = isRaceActive || isTimerRunning;
 
-    loadTimerState();
+    if (shouldResumeRace && currentRaceId) {
+        // --- CAS A : REPRISE DE COURSE ---
+        const stateStr = localStorage.getItem('stratefreez-form-state');
+        if (stateStr) {
+            let parsedState = JSON.parse(stateStr);
+            applyFormStateToDOM(parsedState);
+            if (parsedState['race-name-input']) syncFileName(parsedState['race-name-input']);
+        }
 
-    const savedTab = localStorage.getItem('stratefreez-current-tab') || 'tab-params';
-    openTab(savedTab);
+        const stratData = localStorage.getItem('stratefreez-data');
+        if (stratData) strategySplits = JSON.parse(stratData);
 
-    setSaveBadge(false);
+        cascadeFixPitWindows();
+        loadTimerState();
+        updatePinDisplay();
+        updateSnapshotDropdown();
+
+        // Focus intelligent : On force l'onglet 3 si on était sur les paramétrages au moment du crash
+        let savedTab = localStorage.getItem('stratefreez-current-tab') || 'tab-strategy';
+        if (savedTab === 'tab-params' || savedTab === 'tab-tech') savedTab = 'tab-strategy';
+        openTab(savedTab);
+        setSaveBadge(false);
+
+    } else {
+        // --- CAS B : NOUVELLE SESSION (Course vierge ou terminée) ---
+        clearCurrentRaceData();
+        updateDynamicFields();
+        populateJoinDropdown();
+        openTab('tab-params');
+    }
 });
+
+// ==========================================
+// --- AXE 1 : GESTION LOBBY (Nouvelle / Rejoindre Course) ---
+// ==========================================
+function updatePinDisplay() {
+    const pinBlock = document.getElementById('race-pin-display');
+    const pinValue = document.getElementById('race-pin-value');
+    if (currentRacePin && currentRaceId) {
+        if (pinValue) pinValue.innerText = currentRacePin;
+        if (pinBlock) pinBlock.classList.remove('hidden');
+    } else {
+        if (pinBlock) pinBlock.classList.add('hidden');
+    }
+}
+
+function clearCurrentRaceData() {
+    currentRaceId = null;
+    currentRacePin = null;
+    isRaceActive = false;
+    localStorage.removeItem('stratefreez-current-race-id');
+    localStorage.removeItem('stratefreez-current-race-pin');
+    localStorage.setItem('stratefreez-is-race-active', 'false');
+
+    document.getElementById('form-params').reset();
+    document.getElementById('form-tech').reset();
+    strategySplits = [];
+
+    document.getElementById('num-drivers').value = 1;
+    document.getElementById('num-spotters').value = 1;
+    document.getElementById('total-splits').value = 1;
+    // 🚀 AXE 2 : On s'assure de vider le champ de duplication dans l'onglet Data
+    let duplicateInput = document.getElementById('save-config-name');
+    if (duplicateInput) duplicateInput.value = '';
+    updatePinDisplay();
+    updateSnapshotDropdown();
+}
+
+function openNewRaceModal() {
+    document.getElementById('new-race-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('new-race-input').focus(), 50);
+}
+
+function closeNewRaceModal() {
+    document.getElementById('new-race-modal').classList.add('hidden');
+}
+
+function confirmNewRace() {
+    let raceName = document.getElementById('new-race-input').value.trim();
+    if (!raceName) return alert("Veuillez saisir un nom pour l'épreuve.");
+
+    // 🚀 AXE 1 : Vérification anti-doublon (Nom de la course active)
+    let currentName = document.getElementById('race-name-input')?.value.trim();
+    if (raceName === currentName) {
+        return alert("Ce nom est déjà utilisé par la course actuellement ouverte.");
+    }
+
+    // (Optionnel) Vérification anti-doublon dans le menu déroulant des courses
+    let select = document.getElementById('join-race-select');
+    if (select) {
+        let options = Array.from(select.options).map(opt => opt.text);
+        if (options.includes(raceName)) {
+            return alert("Ce nom est déjà utilisé par une autre course existante.");
+        }
+    }
+
+    clearCurrentRaceData(); // Purge avant création
+
+    // Génération du Token de session
+    currentRaceId = 'race_' + Date.now();
+    currentRacePin = Math.floor(1000 + Math.random() * 9000).toString();
+    isRaceActive = true;
+
+    localStorage.setItem('stratefreez-current-race-id', currentRaceId);
+    localStorage.setItem('stratefreez-current-race-pin', currentRacePin);
+    localStorage.setItem('stratefreez-is-race-active', 'true');
+
+    closeNewRaceModal();
+    document.getElementById('race-name-input').value = raceName;
+    syncFileName(raceName);
+
+    updateDynamicFields();
+    updatePinDisplay();
+    saveFormState();
+
+    openTab('tab-params');
+}
+
+function showJoinDropdown() {
+    const btn = document.getElementById('btn-show-join');
+    const select = document.getElementById('join-race-select');
+
+    btn.classList.add('hidden');
+    select.classList.remove('hidden');
+
+    // 🚀 ÉTAPE 2 : Recherche Cloud au moment du clic
+    populateJoinDropdown();
+}
+
+// 🚀 FONCTION ASYNCHRONE CLOUD (Les 3 catégories)
+async function populateJoinDropdown() {
+    const select = document.getElementById('join-race-select');
+    select.innerHTML = '<option value="">⏳ Recherche de courses...</option>';
+
+    try {
+        const snapshot = await db.collection('races').get();
+
+        if (snapshot.empty) {
+            select.innerHTML = '<option value="" disabled>Aucune course dans la base</option>';
+            return;
+        }
+
+        let enCours = [];
+        let pretes = [];
+        let terminees = [];
+
+        // 1. Tri dans les 3 catégories
+        snapshot.forEach(doc => {
+            let data = doc.data();
+            if (data.id !== currentRaceId) { // Exclut la course actuellement ouverte
+                if (!data.isActive) {
+                    terminees.push(data);
+                } else if (data.isTimerRunning) {
+                    enCours.push(data);
+                } else {
+                    pretes.push(data);
+                }
+            }
+        });
+
+        // 2. Tri par date (le plus récent en haut)
+        const sortByDate = (a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0);
+        enCours.sort(sortByDate);
+        pretes.sort(sortByDate);
+        terminees.sort(sortByDate);
+
+        // 3. Construction des balises HTML <optgroup>
+        select.innerHTML = '<option value="">-- Choisir une course --</option>';
+
+        if (enCours.length > 0) {
+            let groupEnCours = document.createElement('optgroup');
+            groupEnCours.label = "🟢 COURSES EN COURS";
+            enCours.forEach(d => groupEnCours.insertAdjacentHTML('beforeend', `<option value="${d.id}">▶ ${d.name}</option>`));
+            select.appendChild(groupEnCours);
+        }
+
+        if (pretes.length > 0) {
+            let groupPretes = document.createElement('optgroup');
+            groupPretes.label = "🟠 COURSES PRÊTES";
+            pretes.forEach(d => groupPretes.insertAdjacentHTML('beforeend', `<option value="${d.id}">⏸ ${d.name}</option>`));
+            select.appendChild(groupPretes);
+        }
+
+        if (terminees.length > 0) {
+            let groupTerminees = document.createElement('optgroup');
+            groupTerminees.label = "🏁 COURSES TERMINÉES";
+            terminees.forEach(d => groupTerminees.insertAdjacentHTML('beforeend', `<option value="${d.id}">▪ ${d.name}</option>`));
+            select.appendChild(groupTerminees);
+        }
+
+    } catch (error) {
+        console.error("Erreur de récupération Firestore :", error);
+        select.innerHTML = '<option value="">-- Erreur de connexion au serveur --</option>';
+    }
+}
+
+function triggerSwitchRace(raceId) {
+    if (!raceId) return;
+    pendingSwitchRaceId = raceId;
+    let select = document.getElementById('join-race-select');
+    let btn = document.getElementById('btn-show-join');
+
+    document.getElementById('switch-race-name').innerText = select.options[select.selectedIndex].text;
+    document.getElementById('switch-race-modal').classList.remove('hidden');
+
+    // On referme le menu immédiatement après le choix
+    select.value = "";
+    select.classList.add('hidden');
+    if (btn) btn.classList.remove('hidden');
+}
+
+function cancelSwitchRace() {
+    pendingSwitchRaceId = null;
+    document.getElementById('switch-race-modal').classList.add('hidden');
+}
+
+function confirmSwitchRace() {
+    // TODO: Logique de chargement distant à brancher ici
+    document.getElementById('switch-race-modal').classList.add('hidden');
+    openTab('tab-strategy'); // Focus direct sur le tableau
+}
 
 // ==========================================
 // --- ONGLET 1 & 2 : FONCTIONS MÉTIER ---
@@ -1420,10 +1690,11 @@ function stopTimer(isRaceEnd) {
     updateLiveSpotter(0, null);
 
     if (isRaceEnd) {
-        let banner = document.getElementById('end-race-banner');
-        if (banner) {
-            banner.classList.remove('hidden');
-            setTimeout(() => { banner.classList.add('hidden'); }, 10000);
+        localStorage.setItem('stratefreez-is-race-active', 'false'); // 🚀 AXE 1 : Marque la course comme terminée
+        isRaceActive = false; // Mise à jour de la variable globale
+        // 🚀 ÉTAPE 1 : On désactive la course dans le Cloud pour la cacher du menu "Rejoindre"
+        if (currentRaceId) {
+            db.collection('races').doc(currentRaceId).update({ isActive: false }).catch(e => console.error(e));
         }
     }
 }
@@ -3907,4 +4178,131 @@ function downloadPlanningCSV() {
     a.href = URL.createObjectURL(blob);
     a.download = "STRATEFREEZ_Planning_Equipe.csv";
     a.click();
+}
+
+// ==========================================
+// --- AXE 2 : SUPPRESSION DÉFINITIVE ---
+// ==========================================
+function openDeleteRaceModal() {
+    let input = document.getElementById('delete-race-input');
+    if (input) input.value = '';
+    checkDeleteRaceInput();
+    document.getElementById('delete-race-modal').classList.remove('hidden');
+    setTimeout(() => { if (input) input.focus(); }, 50);
+}
+
+function closeDeleteRaceModal() {
+    document.getElementById('delete-race-modal').classList.add('hidden');
+}
+
+function checkDeleteRaceInput() {
+    let val = document.getElementById('delete-race-input')?.value.toUpperCase();
+    let btn = document.getElementById('btn-confirm-delete-race');
+    if (btn) {
+        if (val === 'SUPPRIMER') {
+            btn.disabled = false;
+            btn.classList.remove('btn-disabled');
+        } else {
+            btn.disabled = true;
+            btn.classList.add('btn-disabled');
+        }
+    }
+}
+
+function confirmDeleteRace() {
+    closeDeleteRaceModal();
+    // 1. On supprime les snapshots associés
+    if (currentRaceId) localStorage.removeItem(`stratefreez-snapshots-${currentRaceId}`);
+
+    // 2. On vide tout et on renvoie à l'accueil
+    clearCurrentRaceData();
+    openTab('tab-params');
+}
+
+// ==========================================
+// --- AXE 4 : SNAPSHOTS (INSTANTANÉS) ---
+// ==========================================
+function loadSnapshotsFromStorage() {
+    if (!currentRaceId) return [];
+    let snaps = localStorage.getItem(`stratefreez-snapshots-${currentRaceId}`);
+    return snaps ? JSON.parse(snaps) : [];
+}
+
+function saveSnapshotsToStorage(snaps) {
+    if (!currentRaceId) return;
+    localStorage.setItem(`stratefreez-snapshots-${currentRaceId}`, JSON.stringify(snaps));
+}
+
+function updateSnapshotDropdown() {
+    let select = document.getElementById('snapshot-select');
+    let msg = document.getElementById('no-snapshot-msg');
+    if (!select || !msg) return;
+
+    let snaps = loadSnapshotsFromStorage();
+    if (snaps.length > 0) {
+        select.classList.remove('hidden');
+        msg.classList.add('hidden');
+        select.innerHTML = '<option value="">-- Charger un instantané --</option>';
+        snaps.forEach((snap, idx) => {
+            let d = new Date(snap.timestamp);
+            let timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            let label = `📸 ${timeStr} - ${snap.name}`;
+            select.insertAdjacentHTML('beforeend', `<option value="${idx}">${label}</option>`);
+        });
+    } else {
+        select.classList.add('hidden');
+        msg.classList.remove('hidden');
+        select.innerHTML = '<option value="">-- Charger un instantané --</option>';
+    }
+}
+
+function takeSnapshot() {
+    if (!currentRaceId) return alert("Aucune course active.");
+
+    let stateStr = localStorage.getItem('stratefreez-form-state');
+    let stratStr = localStorage.getItem('stratefreez-data');
+    let raceName = document.getElementById('race-name-input')?.value || 'État sans nom';
+
+    let snap = {
+        timestamp: Date.now(),
+        name: raceName,
+        formState: stateStr ? JSON.parse(stateStr) : {},
+        strategyData: stratStr ? JSON.parse(stratStr) : []
+    };
+
+    let snaps = loadSnapshotsFromStorage();
+    snaps.push(snap);
+    saveSnapshotsToStorage(snaps);
+    updateSnapshotDropdown();
+
+    // Feedback visuel sur le bouton
+    let btn = document.querySelector('#tab-export .btn-import');
+    if (btn) {
+        let oldHTML = btn.innerHTML;
+        btn.innerHTML = `<span class="material-symbols-outlined">check_circle</span> Capturé !`;
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerHTML = oldHTML;
+            btn.classList.remove('btn-success');
+        }, 2000);
+    }
+}
+
+function restoreSnapshot(idx) {
+    if (idx === "") return;
+    let snaps = loadSnapshotsFromStorage();
+    let snap = snaps[idx];
+    if (!snap) return;
+
+    localStorage.setItem('stratefreez-form-state', JSON.stringify(snap.formState));
+    localStorage.setItem('stratefreez-data', JSON.stringify(snap.strategyData));
+    strategySplits = snap.strategyData;
+
+    applyFormStateToDOM(snap.formState);
+    cascadeFixPitWindows();
+    saveFormState();
+    renderStrategy();
+
+    document.getElementById('snapshot-select').value = ""; // Reset du select
+    openTab('tab-strategy'); // On bascule sur la stratégie pour voir le résultat
 }

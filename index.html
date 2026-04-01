@@ -29,8 +29,8 @@
                     <li><button onclick="openTab('tab-export')" class="nav-btn btn-data">Datas</button></li>
                 </ul>
             </div>
-            <div id="save-status-badge" class="save-badge unsaved" onclick="openQuickSaveModal()" title="Sauvegarder rapidement">
-                <span class="material-symbols-outlined icon-sm">save</span> <span class="hide-on-mobile">Modifié</span>
+            <div id="save-status-badge" class="save-badge unsaved" onclick="executeSave()" title="Sauvegarder / Verrouiller">
+                <span id="save-lock-icon" class="material-symbols-outlined icon-sm">lock_open</span>
             </div>
         </nav>
         <div id="global-alert-banner" class="global-alert-banner hidden">
@@ -51,13 +51,27 @@
                 </button>
             </div>
 
+            <div id="race-selection-block" class="mb-15">
+                <button class="action-btn magic-btn flex-1 mh-40 min-w-200" onclick="openNewRaceModal()">
+                    <span class="material-symbols-outlined icon-align-middle mr-5">add_circle</span> Nouvelle course
+                </button>
+                <div class="flex-1 d-flex min-w-200" id="join-race-container">
+                    <button id="btn-show-join" class="action-btn btn-grey-flex w-100 justify-center mh-40" onclick="showJoinDropdown()">
+                        <span class="material-symbols-outlined icon-align-middle mr-5">login</span> Rejoindre une course
+                    </button>
+                    <select id="join-race-select" class="table-select w-100 hidden mh-40" onchange="triggerSwitchRace(this.value)">
+                        <option value="">-- Choisir une course --</option>
+                    </select>
+                </div>
+            </div>
+
             <form id="form-params" class="grid-form" onsubmit="return false;">
                 <fieldset>
                     <legend>Informations de la Course</legend>
                     <div class="multi-input-group">
                         <div class="input-cell">
                             <label class="sub-label">Nom de l'épreuve</label>
-                            <input type="text" id="race-name-input" placeholder="Pour la sauvegarde" oninput="syncFileName(this.value)">
+                            <input type="text" id="race-name-input" placeholder="Aucune course active" disabled>
                         </div>
                         <div class="input-cell">
                             <label class="sub-label">Voiture</label>
@@ -415,23 +429,40 @@
         </section>
 
         <section id="tab-export" class="tab-content hidden">
-            <h2>Datas & Planning</h2>
-            <p class="help-text">Gérez vos fichiers et générez vos documents.</p>
+            <div class="tab-header-flex align-start">
+                <div>
+                    <h2 class="m-0">Datas & Planning</h2>
+                    <p class="help-text mt-5 mb-0">Gérez vos fichiers et générez vos documents.</p>
+                </div>
+                <div id="race-pin-display" class="hidden text-right">
+                    <span class="text-grey fs-09 block">CODE PIN COURSE</span>
+                    <strong id="race-pin-value" class="text-success fs-1-5 font-monospace">----</strong>
+                </div>
+            </div>
 
-            <div class="datas-zone">
+            <div class="datas-zone mt-20">
                 <h3 class="section-title">💾 GESTION DE LA SESSION</h3>
                 <div class="d-flex gap-20 flex-wrap mt-20">
 
                     <div class="export-card border-danger flex-1 min-w-300">
-                        <h3 class="text-danger"><span class="material-symbols-outlined icon-align-middle fs-1-2">save</span> Sauvegarder session</h3>
-                        <input type="text" id="save-config-name" class="export-input mh-40" placeholder="Nom du fichier (Ex: Nurb_24h)" oninput="syncFileName(this.value)">
-                        <button class="action-btn magic-btn w-100 mh-40 mt-auto" onclick="executeSave()">Télécharger .JSON</button>
+                        <h3 class="text-danger w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2">content_copy</span> Dupliquer la course</h3>
+                        <input type="text" id="save-config-name" class="export-input mh-40" placeholder="Nouveau nom de course" oninput="syncFileName(this.value)">
+                        <button class="action-btn magic-btn w-100 mh-40 mt-auto" onclick="duplicateRace()">Créer une copie</button>
                     </div>
 
                     <div class="export-card bg-success-light border-success flex-1 min-w-300">
-                        <h3 class="text-success"><span class="material-symbols-outlined icon-align-middle fs-1-2">folder_open</span> Charger session</h3>
-                        <input type="file" id="import-config-file" accept=".json" class="hidden" onchange="loadConfig(event)">
-                        <button class="action-btn btn-import w-100 mh-40 mt-auto " onclick="document.getElementById('import-config-file').click()">Importer un .JSON</button>
+                        <h3 class="text-success w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2">photo_camera</span> Instantanés</h3>
+
+                        <div class="w-100 mt-15 mb-15 text-center">
+                            <select id="snapshot-select" class="table-select w-100 mh-40 hidden" onchange="restoreSnapshot(this.value)">
+                                <option value="">-- Charger un instantané --</option>
+                            </select>
+                            <p id="no-snapshot-msg" class="help-text m-0 mt-5">Aucun instantané disponible.</p>
+                        </div>
+
+                        <button class="action-btn btn-import w-100 mh-40 mt-auto d-flex align-center justify-center gap-10" onclick="takeSnapshot()">
+                            <span class="material-symbols-outlined">add_a_photo</span> Capturer l'état actuel
+                        </button>
                     </div>
 
                 </div>
@@ -465,6 +496,13 @@
                             </button>
                         </div>
                     </div>
+
+                    <div class="export-card border-danger w-100 mt-20" style="border-style: dashed;">
+                        <h3 class="text-danger w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2">delete_forever</span> Zone de danger</h3>
+                        <p class="help-text mt-10 mb-15 text-center">Suppression définitive de la course actuelle et de tous ses instantanés.</p>
+                        <button class="action-btn btn-danger w-100 mh-40 mt-auto" onclick="openDeleteRaceModal()">SUPPRIMER LA COURSE</button>
+                    </div>
+
                 </div>
             </div>
         </section>
@@ -537,6 +575,52 @@
             <div class="justify-space-around d-flex">
                 <button class="action-btn btn-grey" onclick="closeRestartModal()">Annuler</button>
                 <button class="action-btn btn-warning" onclick="confirmRestartRace()">RELANCER</button>
+            </div>
+        </div>
+    </div>
+    <div id="new-race-modal" class="modal hidden">
+        <div class="modal-content border-top-primary">
+            <h3 class="modal-title-red" style="color: #cc2d53;">🏁 NOUVELLE COURSE</h3>
+            <p>Saisissez le nom de l'épreuve :</p>
+            <input type="text" id="new-race-input" placeholder="Ex: Nurb_24h" class="modal-input-text" onkeydown="if(event.key==='Enter'){confirmNewRace();}">
+            <div class="modal-btn-group mt-15">
+                <button class="action-btn btn-grey" onclick="closeNewRaceModal()">Annuler</button>
+                <button class="action-btn magic-btn" onclick="confirmNewRace()">CRÉER</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="switch-race-modal" class="modal hidden">
+        <div class="modal-content border-top-warning">
+            <h3 class="modal-title-red" style="color: #ffb74d;">⚠️ CHANGEMENT DE COURSE</h3>
+            <p class="modal-confirm-text mt-15 mb-20">Êtes-vous sûr de vouloir quitter la course actuelle pour charger <strong id="switch-race-name" class="text-warning">...</strong> ?</p>
+            <div class="justify-space-around d-flex">
+                <button class="action-btn btn-grey" onclick="cancelSwitchRace()">Annuler</button>
+                <button class="action-btn btn-warning" onclick="confirmSwitchRace()">REJOINDRE</button>
+            </div>
+        </div>
+    </div>
+    <div id="delete-race-modal" class="modal hidden">
+        <div class="modal-content border-top-danger">
+            <h3 class="modal-title-red">🔥 SUPPRESSION DÉFINITIVE</h3>
+            <p class="fs-09 mb-15">Cette action est irréversible. Pour confirmer, veuillez taper <strong class="text-danger">SUPPRIMER</strong> ci-dessous :</p>
+
+            <input type="text" id="delete-race-input" placeholder="Tapez SUPPRIMER" class="modal-input-stop w-100" oninput="checkDeleteRaceInput()" onkeydown="if(event.key==='Enter' && !document.getElementById('btn-confirm-delete-race').disabled){confirmDeleteRace();}">
+
+            <div class="modal-btn-group mt-15">
+                <button class="action-btn btn-grey" onclick="closeDeleteRaceModal()">Annuler</button>
+                <button id="btn-confirm-delete-race" class="action-btn btn-danger btn-disabled" disabled onclick="confirmDeleteRace()">DÉTRUIRE</button>
+            </div>
+        </div>
+    </div>
+    <div id="duplicate-error-modal" class="modal hidden">
+        <div class="modal-content border-top-danger">
+            <h3 class="modal-title-red">❌ NOM INVALIDE</h3>
+            <p class="modal-confirm-text mt-15 mb-20" style="font-weight: normal;">
+                Veuillez saisir un nom <strong class="text-danger">valide et différent</strong> de la course actuelle pour pouvoir la dupliquer.
+            </p>
+            <div class="justify-center d-flex">
+                <button class="action-btn btn-danger w-120" onclick="closeDuplicateErrorModal()">Compris</button>
             </div>
         </div>
     </div>

@@ -130,9 +130,9 @@ function saveFormState() {
 
     // 🚀 ÉTAPE 1 : SYNCHRONISATION FIREBASE (CLOUD)
     if (currentRaceId && isRaceActive) {
-        // On vérifie si le chrono tourne pour la catégorisation
         let timerStr = localStorage.getItem('stratefreez-timer');
-        let isTimerRunning = timerStr ? JSON.parse(timerStr).active : false;
+        let timerState = timerStr ? JSON.parse(timerStr) : null;
+        let isTimerRunning = timerState ? timerState.active : false;
 
         db.collection('races').doc(currentRaceId).set({
             id: currentRaceId,
@@ -140,7 +140,8 @@ function saveFormState() {
             name: state['race-name-input'] || 'Course sans nom',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             isActive: true,
-            isTimerRunning: isTimerRunning, // 🚀 L'INFO VITALE POUR LE TRI
+            isTimerRunning: isTimerRunning,
+            timerState: timerState, // 🚀 NOUVEAU : On envoie les données complètes du chrono
             formState: state,
             strategyData: strategySplits
         }).catch(err => console.error("Erreur de synchro Cloud :", err));
@@ -813,27 +814,56 @@ async function confirmSwitchRace() {
 
 // 🚀 FONCTION D'ÉCOUTE MAGIQUE (Le Multijoueur)
 function listenToCloudRace() {
-    if (unsubscribeCloud) unsubscribeCloud(); // Coupe l'ancienne écoute si on change de course
+    if (unsubscribeCloud) unsubscribeCloud();
     if (!currentRaceId) return;
 
     unsubscribeCloud = db.collection('races').doc(currentRaceId).onSnapshot(doc => {
         if (doc.exists) {
             const data = doc.data();
 
-            // Si l'utilisateur est en train de taper dans un input, on ne met pas à jour 
-            // l'onglet 1 et 2 pour ne pas effacer ce qu'il tape en cours de route.
-            let isTyping = (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT');
+            // 1. SÉCURITÉ DE SAISIE (Empêche le clavier de se fermer)
+            let activeEl = document.activeElement;
+            let isTyping = activeEl && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName);
 
-            // On met TOUJOURS à jour la stratégie visuelle
-            if (data.strategyData) {
+            // 2. MISE À JOUR STRATÉGIE (Seulement si on ne tape pas)
+            if (data.strategyData && !isTyping) {
                 strategySplits = data.strategyData;
                 localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
                 renderStrategy();
             }
 
-            // On met à jour le formulaire seulement si on ne tape pas dedans
+            // 3. MISE À JOUR FORMULAIRES (Seulement si on ne tape pas)
             if (data.formState && !isTyping) {
                 applyFormStateToDOM(data.formState);
+            }
+
+            // 4. SYNCHRO DU CHRONO 🚀
+            let localTimerStr = localStorage.getItem('stratefreez-timer');
+            let localTimer = localTimerStr ? JSON.parse(localTimerStr) : null;
+
+            if (data.timerState && data.timerState.active) {
+                // Le cloud demande au chrono de tourner
+                if (!localTimer || !localTimer.active || localTimer.startTimeReal !== data.timerState.startTimeReal) {
+                    localStorage.setItem('stratefreez-timer', JSON.stringify(data.timerState));
+                    loadTimerState(); // Relance la boucle de chrono visuel locale
+                }
+            } else {
+                // Le cloud dit que le chrono est arrêté
+                if (localTimer && localTimer.active) {
+                    // Arrêt purement local (sans renvoyer de requête au cloud)
+                    liveTimerActive = false;
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    localStorage.removeItem('stratefreez-timer');
+
+                    let navTitle = document.getElementById('nav-brand-text');
+                    if (navTitle) {
+                        navTitle.innerText = "STRATEFREEZ";
+                        navTitle.classList.remove('chrono-active');
+                    }
+                    document.querySelectorAll('.active-live-stint').forEach(el => el.classList.remove('active-live-stint'));
+                    renderStrategy();
+                    updateLiveSpotter(0, null);
+                }
             }
         }
     });
@@ -1769,17 +1799,36 @@ function stopTimer(isRaceEnd) {
     }
     document.querySelectorAll('.active-live-stint').forEach(el => el.classList.remove('active-live-stint'));
 
-    renderStrategy();
-    updateLiveSpotter(0, null);
-
+    // 🚀 GESTION DU CLOUD (On prévient les autres que le chrono s'arrête)
     if (isRaceEnd) {
-        localStorage.setItem('stratefreez-is-race-active', 'false'); // 🚀 AXE 1 : Marque la course comme terminée
-        isRaceActive = false; // Mise à jour de la variable globale
-        // 🚀 ÉTAPE 1 : On désactive la course dans le Cloud pour la cacher du menu "Rejoindre"
+        localStorage.setItem('stratefreez-is-race-active', 'false');
+        isRaceActive = false;
+
         if (currentRaceId) {
-            db.collection('races').doc(currentRaceId).update({ isActive: false }).catch(e => console.error(e));
+            db.collection('races').doc(currentRaceId).update({
+                isActive: false,
+                isTimerRunning: false,
+                timerState: null
+            }).catch(e => console.error(e));
+        }
+
+        let banner = document.getElementById('end-race-banner');
+        if (banner) {
+            banner.classList.remove('hidden');
+            setTimeout(() => { banner.classList.add('hidden'); }, 10000);
+        }
+    } else {
+        // Arrêt manuel en cours de course
+        if (currentRaceId && isRaceActive) {
+            db.collection('races').doc(currentRaceId).update({
+                isTimerRunning: false,
+                timerState: null
+            }).catch(e => console.error(e));
         }
     }
+
+    renderStrategy();
+    updateLiveSpotter(0, null);
 }
 
 function loadTimerState() {

@@ -128,24 +128,8 @@ function saveFormState() {
     localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
     setSaveBadge(false);
 
-    // 🚀 ÉTAPE 1 : SYNCHRONISATION FIREBASE (CLOUD)
-    if (currentRaceId && isRaceActive) {
-        let timerStr = localStorage.getItem('stratefreez-timer');
-        let timerState = timerStr ? JSON.parse(timerStr) : null;
-        let isTimerRunning = timerState ? timerState.active : false;
-
-        db.collection('races').doc(currentRaceId).set({
-            id: currentRaceId,
-            pin: currentRacePin,
-            name: state['race-name-input'] || 'Course sans nom',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            isActive: true,
-            isTimerRunning: isTimerRunning,
-            timerState: timerState, // 🚀 NOUVEAU : On envoie les données complètes du chrono
-            formState: state,
-            strategyData: strategySplits
-        }).catch(err => console.error("Erreur de synchro Cloud :", err));
-    }
+    // 🚀 NOUVEAU : On délègue à l'amortisseur Cloud
+    triggerCloudSync();
 }
 
 let globalSaveTimeout = null;
@@ -520,6 +504,96 @@ let currentRaceId = localStorage.getItem('stratefreez-current-race-id') || null;
 let currentRacePin = localStorage.getItem('stratefreez-current-race-pin') || null;
 let isRaceActive = localStorage.getItem('stratefreez-is-race-active') === 'true';
 let pendingSwitchRaceId = null;
+let unsubscribeCloud = null;
+
+// 🚀 NOUVELLES VARIABLES SÉCURITÉ & RÉSEAU
+let isEngineerMode = localStorage.getItem('stratefreez-is-engineer') === 'true';
+let cloudSyncTimeout = null; // L'amortisseur de requêtes Firebase
+
+// ==========================================
+// --- AXE 2 & 5 : SÉCURITÉ ET AMORTISSEUR CLOUD ---
+// ==========================================
+function triggerCloudSync() {
+    // 🛡️ PROTECTIONS : Pas de course ? Pas ingénieur ? Hors-ligne ? On bloque l'envoi !
+    if (!currentRaceId || !isRaceActive || !isEngineerMode || !navigator.onLine) return;
+
+    // 🛡️ AMORTISSEUR : On annule l'envoi précédent s'il y a une nouvelle frappe
+    if (cloudSyncTimeout) clearTimeout(cloudSyncTimeout);
+
+    // On regroupe tout et on envoie au bout de 800ms de silence (protège les quotas Firebase)
+    cloudSyncTimeout = setTimeout(() => {
+        let stateStr = localStorage.getItem('stratefreez-form-state');
+        let stratStr = localStorage.getItem('stratefreez-data');
+        let timerStr = localStorage.getItem('stratefreez-timer');
+        let timerState = timerStr ? JSON.parse(timerStr) : null;
+
+        db.collection('races').doc(currentRaceId).update({
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            formState: stateStr ? JSON.parse(stateStr) : {},
+            strategyData: stratStr ? JSON.parse(stratStr) : [],
+            timerState: timerState,
+            isTimerRunning: timerState ? timerState.active : false
+        }).catch(err => console.error("Erreur de synchro Cloud :", err));
+    }, 800);
+}
+
+// Nettoie l'envoi Cloud de l'ancienne fonction saveFormState
+// (Il faut chercher db.collection('races').doc(currentRaceId).set(...) dans saveFormState et le remplacer par triggerCloudSync();)
+
+function toggleObserverMode(isLocked) {
+    document.body.classList.toggle('observer-locked', isLocked);
+    let badge = document.getElementById('save-status-badge');
+    if (badge) {
+        if (isLocked) {
+            badge.classList.remove('saved', 'unsaved');
+            badge.style.backgroundColor = '#555'; // Gris pour observateur
+            badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock</span>';
+            badge.title = "Mode Observateur - Cliquer pour déverrouiller";
+        } else {
+            badge.classList.remove('unsaved');
+            badge.classList.add('saved'); // Vert pour ingénieur
+            badge.style.backgroundColor = '';
+            badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
+            badge.title = "Mode Ingénieur Actif";
+        }
+    }
+}
+
+function handlePadlockClick() {
+    if (isEngineerMode) {
+        // Déjà ingénieur ? On lance le téléchargement manuel de secours JSON (ancien comportement)
+        executeSave();
+    } else {
+        // Observateur ? On demande le PIN
+        document.getElementById('pin-auth-input').value = '';
+        document.getElementById('pin-error-msg').classList.add('hidden');
+        document.getElementById('pin-auth-modal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('pin-auth-input').focus(), 50);
+    }
+}
+
+function closePinAuthModal() { document.getElementById('pin-auth-modal').classList.add('hidden'); }
+
+function confirmPinAuth() {
+    let input = document.getElementById('pin-auth-input').value.trim();
+    if (input === currentRacePin) {
+        isEngineerMode = true;
+        localStorage.setItem('stratefreez-is-engineer', 'true');
+        toggleObserverMode(false);
+        closePinAuthModal();
+    } else {
+        document.getElementById('pin-error-msg').classList.remove('hidden');
+    }
+}
+
+// 🌐 ÉCOUTEURS DE RÉSEAU (AXE 5)
+window.addEventListener('offline', () => {
+    document.getElementById('save-status-badge').classList.add('padlock-offline');
+});
+window.addEventListener('online', () => {
+    document.getElementById('save-status-badge').classList.remove('padlock-offline');
+    if (isEngineerMode) triggerCloudSync(); // Force une synchro au retour de la connexion
+});
 
 // ==========================================
 // --- INITIALISATION INTELLIGENTE (F5) ---
@@ -617,31 +691,32 @@ function confirmNewRace() {
     let raceName = document.getElementById('new-race-input').value.trim();
     if (!raceName) return alert("Veuillez saisir un nom pour l'épreuve.");
 
-    // 🚀 AXE 1 : Vérification anti-doublon (Nom de la course active)
     let currentName = document.getElementById('race-name-input')?.value.trim();
-    if (raceName === currentName) {
-        return alert("Ce nom est déjà utilisé par la course actuellement ouverte.");
-    }
+    if (raceName === currentName) return alert("Ce nom est déjà utilisé par la course actuellement ouverte.");
 
-    // (Optionnel) Vérification anti-doublon dans le menu déroulant des courses
-    let select = document.getElementById('join-race-select');
-    if (select) {
-        let options = Array.from(select.options).map(opt => opt.text);
-        if (options.includes(raceName)) {
-            return alert("Ce nom est déjà utilisé par une autre course existante.");
-        }
-    }
+    clearCurrentRaceData();
 
-    clearCurrentRaceData(); // Purge avant création
-
-    // Génération du Token de session
     currentRaceId = 'race_' + Date.now();
     currentRacePin = Math.floor(1000 + Math.random() * 9000).toString();
     isRaceActive = true;
 
+    // 🚀 AXE 2 : Le créateur est automatiquement Ingénieur
+    isEngineerMode = true;
+
     localStorage.setItem('stratefreez-current-race-id', currentRaceId);
     localStorage.setItem('stratefreez-current-race-pin', currentRacePin);
     localStorage.setItem('stratefreez-is-race-active', 'true');
+    localStorage.setItem('stratefreez-is-engineer', 'true');
+
+    // Création initiale pure dans Firebase
+    db.collection('races').doc(currentRaceId).set({
+        id: currentRaceId,
+        pin: currentRacePin,
+        name: raceName,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        isActive: true,
+        isTimerRunning: false
+    }).catch(err => console.error(err));
 
     closeNewRaceModal();
     document.getElementById('race-name-input').value = raceName;
@@ -650,6 +725,7 @@ function confirmNewRace() {
     updateDynamicFields();
     updatePinDisplay();
     saveFormState();
+    toggleObserverMode(false); // Mode Ingénieur visuel
 
     openTab('tab-params');
 }
@@ -764,6 +840,7 @@ function cancelSwitchRace() {
 let unsubscribeCloud = null;
 
 async function confirmSwitchRace() {
+    isEngineerMode = false; localStorage.setItem('stratefreez-is-engineer', 'false'); toggleObserverMode(true);
     if (!pendingSwitchRaceId) return;
 
     document.getElementById('switch-race-modal').classList.add('hidden');
@@ -4343,8 +4420,12 @@ function checkDeleteRaceInput() {
 
 function confirmDeleteRace() {
     closeDeleteRaceModal();
-    // 1. On supprime les snapshots associés
-    if (currentRaceId) localStorage.removeItem(`stratefreez-snapshots-${currentRaceId}`);
+    // 1. On supprime les snapshots locaux
+    if (currentRaceId) {
+        localStorage.removeItem(`stratefreez-snapshots-${currentRaceId}`);
+        // 🚀 AXE 4 : Destruction physique dans Firebase
+        db.collection('races').doc(currentRaceId).delete().catch(e => console.error("Erreur suppression DB", e));
+    }
 
     // 2. On vide tout et on renvoie à l'accueil
     clearCurrentRaceData();

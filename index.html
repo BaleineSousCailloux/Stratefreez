@@ -29,7 +29,7 @@
                     <li><button onclick="openTab('tab-export')" class="nav-btn btn-data">Datas</button></li>
                 </ul>
             </div>
-            <div id="save-status-badge" class="save-badge unsaved" onclick="executeSave()" title="Sauvegarder / Verrouiller">
+            <div id="save-status-badge" class="save-badge unsaved" onclick="handlePadlockClick()" title="Sauvegarder / Verrouiller">
                 <span id="save-lock-icon" class="material-symbols-outlined icon-sm">lock_open</span>
             </div>
         </nav>
@@ -621,6 +621,18 @@
             </p>
             <div class="justify-center d-flex">
                 <button class="action-btn btn-danger w-120" onclick="closeDuplicateErrorModal()">Compris</button>
+            </div>
+        </div>
+    </div>
+    <div id="pin-auth-modal" class="modal hidden">
+        <div class="modal-content border-top-success">
+            <h3 class="modal-title-green">🔒 DÉVERROUILLAGE</h3>
+            <p class="mb-15">Saisissez le code PIN de la course pour basculer en Mode Ingénieur et activer les modifications.</p>
+            <input type="number" id="pin-auth-input" placeholder="Code PIN" class="modal-input-large font-monospace" onkeydown="if(event.key==='Enter'){confirmPinAuth();}">
+            <p id="pin-error-msg" class="text-danger hidden m-0 mt-5">Code incorrect</p>
+            <div class="modal-btn-group mt-15">
+                <button class="action-btn btn-grey" onclick="closePinAuthModal()">Annuler</button>
+                <button class="action-btn btn-success" onclick="confirmPinAuth()">DÉVERROUILLER</button>
             </div>
         </div>
     </div>

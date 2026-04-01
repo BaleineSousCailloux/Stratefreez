@@ -546,23 +546,25 @@ function toggleObserverMode(isLocked) {
     if (badge) {
         if (isLocked) {
             badge.classList.remove('saved', 'unsaved');
-            badge.style.backgroundColor = '#555'; // Gris pour observateur
+            badge.classList.add('unsaved'); // 🔴 Rouge : Verrouillé (Observateur)
             badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock</span>';
             badge.title = "Mode Observateur - Cliquer pour déverrouiller";
         } else {
             badge.classList.remove('unsaved');
-            badge.classList.add('saved'); // Vert pour ingénieur
-            badge.style.backgroundColor = '';
+            badge.classList.add('saved'); // 🟢 Vert : Ouvert (Ingénieur)
             badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
-            badge.title = "Mode Ingénieur Actif";
+            badge.title = "Mode Ingénieur Actif - Cliquer pour verrouiller";
         }
     }
+    updatePinDisplay(); // Met à jour l'affichage du PIN selon le rôle
 }
 
 function handlePadlockClick() {
     if (isEngineerMode) {
-        // Déjà ingénieur ? On lance le téléchargement manuel de secours JSON (ancien comportement)
-        executeSave();
+        // 🚀 ACTION : On se re-verrouille volontairement (Bascule en Observateur)
+        isEngineerMode = false;
+        localStorage.setItem(`stratefreez-is-engineer-${currentRaceId}`, 'false');
+        toggleObserverMode(true);
     } else {
         // Observateur ? On demande le PIN
         document.getElementById('pin-auth-input').value = '';
@@ -650,7 +652,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function updatePinDisplay() {
     const pinBlock = document.getElementById('race-pin-display');
     const pinValue = document.getElementById('race-pin-value');
-    if (currentRacePin && currentRaceId) {
+
+    // 🚀 SÉCURITÉ : On n'affiche le PIN que si l'utilisateur est DÉJÀ Ingénieur
+    if (currentRacePin && currentRaceId && isEngineerMode) {
         if (pinValue) pinValue.innerText = currentRacePin;
         if (pinBlock) pinBlock.classList.remove('hidden');
     } else {
@@ -1456,6 +1460,16 @@ function startLiveTimer(splitIdx) {
     saveFormState();
     renderStrategy();
     runTimerLoop();
+
+    // 🚀 NOUVEAU : On court-circuite l'attente de 800ms pour envoyer le chrono IMMÉDIATEMENT au Cloud
+    // Cela empêche le rafraîchissement local d'écraser le chrono avant qu'il ne soit sauvegardé !
+    if (currentRaceId && isRaceActive) {
+        db.collection('races').doc(currentRaceId).update({
+            timerState: timerState,
+            isTimerRunning: true,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(e => console.error("Erreur synchro chrono :", e));
+    }
 }
 
 function runTimerLoop() {
@@ -1990,6 +2004,7 @@ function closeBilanModal() { document.getElementById('bilan-modal').classList.ad
 
 // 🚀 NOUVELLE FONCTION : Bascule rapide Eco/Attack depuis l'onglet Live
 function toggleStintFuelStrat(i, j) {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     if (strategySplits[i] && strategySplits[i].stints[j]) {
         let stint = strategySplits[i].stints[j];
         stint.fuelStrat = (stint.fuelStrat === 'push') ? 'eco' : 'push';
@@ -2000,6 +2015,7 @@ function toggleStintFuelStrat(i, j) {
     }
 }
 function openFuelModal(i, j, calcValue) {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     fuelModalTarget = { i, j };
     document.getElementById('fuel-modal-calc').innerText = calcValue.toFixed(1);
     let currentManual = strategySplits[i].stints[j].manualFuel;
@@ -2336,6 +2352,7 @@ function setWindowTarget(splitIdx, target) {
 }
 
 function addStintRow(splitIdx) {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     strategySplits[splitIdx].userDeniedAutoStint = false;
     let tires = getAvailableTires();
     let stints = strategySplits[splitIdx].stints;
@@ -2393,6 +2410,7 @@ function addStintRow(splitIdx) {
 }
 
 function openDeleteModal(splitIdx, stintIdx) {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     rowToDelete = { splitIdx, stintIdx };
     document.getElementById('delete-modal').classList.remove('hidden');
 }
@@ -2415,6 +2433,7 @@ function confirmDeleteRow() {
 }
 
 function openPitModal(i, j) {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     let stint = strategySplits[i].stints[j];
     pitModalTarget = { splitIdx: i, stintIdx: j, startLap: stint.startLap };
 
@@ -2516,6 +2535,7 @@ function confirmPitIn() {
 }
 
 function openUndoPitModal(i, j, currentLaps) {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     undoPitModalTarget = { splitIdx: i, stintIdx: j };
     const input = document.getElementById('undo-pit-modal-lap');
     input.value = currentLaps || '';

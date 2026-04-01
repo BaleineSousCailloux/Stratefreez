@@ -18,6 +18,34 @@ let lastActiveStint = localStorage.getItem('lastActiveStint') || null;
 let lastCalculatedState = null;
 
 // ==========================================
+// --- NOUVEAU : HORLOGE ATOMIQUE (0 Quota) ---
+// ==========================================
+let serverOffset = 0; // Le décalage de la carte mère en millisecondes
+
+async function calibrateTime() {
+    try {
+        let start = Date.now();
+        // On "toque" à la porte du site web pour lire son heure officielle
+        let res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' });
+        let dateHeader = res.headers.get('Date');
+
+        if (dateHeader) {
+            let serverTime = new Date(dateHeader).getTime();
+            let latency = (Date.now() - start) / 2; // On retire le temps de trajet d'internet
+            serverOffset = serverTime - (start + latency);
+            console.log("⏱️ Horloge calibrée ! Décalage local : " + serverOffset + "ms");
+        }
+    } catch (e) {
+        console.warn("⚠️ Impossible de calibrer l'horloge. Utilisation du temps local.");
+    }
+}
+
+// La fonction magique qui remplace le "Date.now()" classique
+function getUnifiedTime() {
+    return Date.now() + serverOffset;
+}
+
+// ==========================================
 // --- MENU ET ERGONOMIE GLOBALE ---
 // ==========================================
 function toggleMenu() {
@@ -393,7 +421,7 @@ function loadConfig(event) {
                 if (strTimer) {
                     let timerState = JSON.parse(strTimer);
                     if (timerState && timerState.active) {
-                        let elapsed = Math.floor((Date.now() - timerState.startTimeReal) / 1000);
+                        let elapsed = Math.floor((getUnifiedTime() - timerState.startTimeReal) / 1000);
                         for (let i = 0; i < strategySplits.length; i++) {
                             if (timerState.type === 'online' && i !== timerState.splitIdx) continue;
                             for (let j = 0; j < strategySplits[i].stints.length; j++) {
@@ -619,6 +647,7 @@ window.addEventListener('online', () => {
 // --- INITIALISATION INTELLIGENTE (F5) ---
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+    calibrateTime(); // 🚀 ON CALIBRE L'HORLOGE DÈS L'OUVERTURE
     bindGlobalSyncEvents();
 
     let timerStr = localStorage.getItem('stratefreez-timer');
@@ -1474,7 +1503,7 @@ function startLiveTimer(splitIdx) {
         type: isOnline ? 'online' : 'irl',
         splitIdx: splitIdx,
         targetSec: targetSec,
-        startTimeReal: Date.now()
+        startTimeReal: getUnifiedTime() // 🚀 UTILISATION DE L'HEURE ATOMIQUE
     };
     localStorage.setItem('stratefreez-timer', JSON.stringify(timerState));
 
@@ -1521,7 +1550,7 @@ function timerTick() {
     let timerState = JSON.parse(str);
     if (!timerState || !timerState.active) return;
 
-    let elapsed = Math.floor((Date.now() - timerState.startTimeReal) / 1000);
+    let elapsed = Math.floor((getUnifiedTime() - timerState.startTimeReal) / 1000);
     let targetSec = timerState.targetSec;
     let isOvertime = elapsed >= targetSec;
 
@@ -2475,7 +2504,7 @@ function openPitModal(i, j) {
     if (str) {
         let timerState = JSON.parse(str);
         if (timerState && timerState.active) {
-            let elapsed = Math.floor((Date.now() - timerState.startTimeReal) / 1000);
+            let elapsed = Math.floor((getUnifiedTime() - timerState.startTimeReal) / 1000);
 
             // Calcul du tour estimé
             let timeInStint = elapsed - stint.startSec;
@@ -2545,7 +2574,7 @@ function confirmPitIn() {
             if (str) {
                 let timerState = JSON.parse(str);
                 if (timerState && timerState.active) {
-                    let elapsed = Math.floor((Date.now() - timerState.startTimeReal) / 1000);
+                    let elapsed = Math.floor((getUnifiedTime() - timerState.startTimeReal) / 1000);
                     strategySplits[sIdx].stints[stIdx].lockedTimeSec = elapsed;
                 } else {
                     strategySplits[sIdx].stints[stIdx].lockedTimeSec = null;

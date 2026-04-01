@@ -843,9 +843,6 @@ function cancelSwitchRace() {
     document.getElementById('switch-race-modal').classList.add('hidden');
 }
 
-// 🚀 NOUVELLE VARIABLE GLOBALE POUR L'ÉCOUTE
-let unsubscribeCloud = null;
-
 async function confirmSwitchRace() {
     if (!pendingSwitchRaceId) return;
 

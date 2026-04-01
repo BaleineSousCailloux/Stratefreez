@@ -157,6 +157,7 @@ body {
 #join-race-select {
     max-width: none !important;
     min-width: 200px !important;
+    min-height: 40px !important;
 }
 
 .save-badge {

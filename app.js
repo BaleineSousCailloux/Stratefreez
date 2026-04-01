@@ -301,11 +301,9 @@ function confirmResetTab2() {
 
 function syncFileName(val) {
     currentFileName = val;
-    let mainInp = document.getElementById('save-config-name');
     let modalInp = document.getElementById('quick-save-name');
-    let raceInp = document.getElementById('race-name-input'); // 🚀 Le nouveau champ
+    let raceInp = document.getElementById('race-name-input');
 
-    if (mainInp && mainInp.value !== val) mainInp.value = val;
     if (modalInp && modalInp.value !== val) modalInp.value = val;
     if (raceInp && raceInp.value !== val) raceInp.value = val;
 }
@@ -550,6 +548,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadTimerState();
         updatePinDisplay();
         updateSnapshotDropdown();
+        listenToCloudRace(); // 🚀 AJOUT ICI : Relance l'écoute après un F5
 
         // Focus intelligent : On force l'onglet 3 si on était sur les paramétrages au moment du crash
         let savedTab = localStorage.getItem('stratefreez-current-tab') || 'tab-strategy';
@@ -600,6 +599,8 @@ function clearCurrentRaceData() {
     if (duplicateInput) duplicateInput.value = '';
     updatePinDisplay();
     updateSnapshotDropdown();
+    // 🚀 AJOUT ICI : On coupe l'écoute du cloud si on vide la course
+    if (unsubscribeCloud) { unsubscribeCloud(); unsubscribeCloud = null; }
 }
 
 function openNewRaceModal() {
@@ -661,6 +662,14 @@ function showJoinDropdown() {
 
     // 🚀 ÉTAPE 2 : Recherche Cloud au moment du clic
     populateJoinDropdown();
+}
+
+// 🚀 NOUVEAU : Fermeture fluide pour les mobiles
+function hideJoinDropdown() {
+    setTimeout(() => {
+        document.getElementById('join-race-select').classList.add('hidden');
+        document.getElementById('btn-show-join').classList.remove('hidden');
+    }, 200);
 }
 
 // 🚀 FONCTION ASYNCHRONE CLOUD (Les 3 catégories)
@@ -750,10 +759,84 @@ function cancelSwitchRace() {
     document.getElementById('switch-race-modal').classList.add('hidden');
 }
 
-function confirmSwitchRace() {
-    // TODO: Logique de chargement distant à brancher ici
+// 🚀 NOUVELLE VARIABLE GLOBALE POUR L'ÉCOUTE
+let unsubscribeCloud = null;
+
+async function confirmSwitchRace() {
+    if (!pendingSwitchRaceId) return;
+
     document.getElementById('switch-race-modal').classList.add('hidden');
-    openTab('tab-strategy'); // Focus direct sur le tableau
+
+    // 1. On purge la course locale actuelle
+    clearCurrentRaceData();
+
+    // 2. On configure les identifiants
+    currentRaceId = pendingSwitchRaceId;
+    localStorage.setItem('stratefreez-current-race-id', currentRaceId);
+
+    // 3. TÉLÉCHARGEMENT INITIAL DEPUIS LE CLOUD
+    try {
+        const doc = await db.collection('races').doc(currentRaceId).get();
+        if (doc.exists) {
+            const data = doc.data();
+
+            currentRacePin = data.pin;
+            isRaceActive = data.isActive;
+            localStorage.setItem('stratefreez-current-race-pin', currentRacePin);
+            localStorage.setItem('stratefreez-is-race-active', isRaceActive);
+
+            // On applique les données du Cloud à l'application
+            if (data.strategyData) {
+                strategySplits = data.strategyData;
+                localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
+            }
+            if (data.formState) applyFormStateToDOM(data.formState);
+
+            updatePinDisplay();
+            renderStrategy();
+
+            // 🚀 4. ON BRANCHE L'ÉCOUTE EN TEMPS RÉEL
+            listenToCloudRace();
+
+            openTab('tab-strategy');
+        } else {
+            alert("Cette course n'existe plus sur le serveur.");
+            clearCurrentRaceData();
+            openTab('tab-params');
+        }
+    } catch (e) {
+        console.error("Erreur de chargement : ", e);
+    }
+
+    pendingSwitchRaceId = null;
+}
+
+// 🚀 FONCTION D'ÉCOUTE MAGIQUE (Le Multijoueur)
+function listenToCloudRace() {
+    if (unsubscribeCloud) unsubscribeCloud(); // Coupe l'ancienne écoute si on change de course
+    if (!currentRaceId) return;
+
+    unsubscribeCloud = db.collection('races').doc(currentRaceId).onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+
+            // Si l'utilisateur est en train de taper dans un input, on ne met pas à jour 
+            // l'onglet 1 et 2 pour ne pas effacer ce qu'il tape en cours de route.
+            let isTyping = (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT');
+
+            // On met TOUJOURS à jour la stratégie visuelle
+            if (data.strategyData) {
+                strategySplits = data.strategyData;
+                localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
+                renderStrategy();
+            }
+
+            // On met à jour le formulaire seulement si on ne tape pas dedans
+            if (data.formState && !isTyping) {
+                applyFormStateToDOM(data.formState);
+            }
+        }
+    });
 }
 
 // ==========================================

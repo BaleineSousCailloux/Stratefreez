@@ -100,6 +100,8 @@ body {
     margin-right: 20px;
     color: #cc2d53;
     transition: all 0.3s ease;
+    cursor: default; /* 🚀 Fini le curseur "Texte" */
+    user-select: none; /* 🚀 Empêche la sélection bleue du texte au clic */
 }
 
     .nav-brand.chrono-active {
@@ -2423,10 +2425,10 @@ svg.live-grey-icon {
 /* Le Bouclier :
    1. Si le petit côté est < 300px
    2. Si le grand côté est < 600px 
-*
-@media (max-width: 299px) and (orientation: portrait), (max-height: 299px) and (orientation: landscape), (max-height: 599px) and (orientation: portrait), (max-width: 599px) and (orientation: landscape) {
+*/
+@media (max-width: 299px) and (orientation: portrait), (max-height: 199px) and (orientation: landscape), (max-height: 449px) and (orientation: portrait), (max-width: 599px) and (orientation: landscape) {
 
-    /* 🚀 MAGIE CSS : On masque absolument TOUS les enfants directs du body, SAUF l'écran de blocage 
+    /* 🚀 MAGIE CSS : On masque absolument TOUS les enfants directs du body, SAUF l'écran de blocage */
     body > *:not(#device-too-small) {
         display: none !important;
     }
@@ -2434,7 +2436,7 @@ svg.live-grey-icon {
     #device-too-small {
         display: flex !important;
     }
-}*/
+}
 
 
 /* ============================================================

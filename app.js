@@ -544,33 +544,50 @@ function toggleObserverMode(isLocked) {
     document.body.classList.toggle('observer-locked', isLocked);
     let badge = document.getElementById('save-status-badge');
     if (badge) {
+        // 🚀 ACCUEIL : Si aucune course n'est chargée, on force le Vert
+        if (!currentRaceId) {
+            badge.classList.remove('unsaved');
+            badge.classList.add('saved');
+            badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
+            badge.title = "Accueil - Prêt à créer";
+            return; // On s'arrête là
+        }
+
         if (isLocked) {
-            badge.classList.remove('saved', 'unsaved');
-            badge.classList.add('unsaved'); // 🔴 Rouge : Verrouillé (Observateur)
+            badge.classList.remove('saved');
+            badge.classList.add('unsaved'); // 🔴 Rouge : Verrouillé (Observateur / Serrure fermée)
             badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock</span>';
             badge.title = "Mode Observateur - Cliquer pour déverrouiller";
         } else {
             badge.classList.remove('unsaved');
-            badge.classList.add('saved'); // 🟢 Vert : Ouvert (Ingénieur)
+            badge.classList.add('saved'); // 🟢 Vert : Ouvert (Ingénieur / Serrure ouverte)
             badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
             badge.title = "Mode Ingénieur Actif - Cliquer pour verrouiller";
         }
     }
-    updatePinDisplay(); // Met à jour l'affichage du PIN selon le rôle
+    updatePinDisplay();
 }
 
 function handlePadlockClick() {
+    if (!currentRaceId) return; // Ne rien faire sur la page d'accueil
+
     if (isEngineerMode) {
-        // 🚀 ACTION : On se re-verrouille volontairement (Bascule en Observateur)
+        // 🚀 SERRURE : On se verrouille visuellement (Sans jeter le passeport)
         isEngineerMode = false;
-        localStorage.setItem(`stratefreez-is-engineer-${currentRaceId}`, 'false');
         toggleObserverMode(true);
     } else {
-        // Observateur ? On demande le PIN
-        document.getElementById('pin-auth-input').value = '';
-        document.getElementById('pin-error-msg').classList.add('hidden');
-        document.getElementById('pin-auth-modal').classList.remove('hidden');
-        setTimeout(() => document.getElementById('pin-auth-input').focus(), 50);
+        // 🚀 PASSEPORT : On vérifie si on a déjà la clé en mémoire
+        let hasPassport = localStorage.getItem(`stratefreez-passport-${currentRaceId}`) === 'true';
+        if (hasPassport) {
+            isEngineerMode = true;
+            toggleObserverMode(false); // Déverrouillage instantané !
+        } else {
+            // Pas de passeport ? On demande le code PIN
+            document.getElementById('pin-auth-input').value = '';
+            document.getElementById('pin-error-msg').classList.add('hidden');
+            document.getElementById('pin-auth-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('pin-auth-input').focus(), 50);
+        }
     }
 }
 
@@ -580,7 +597,8 @@ function confirmPinAuth() {
     let input = document.getElementById('pin-auth-input').value.trim();
     if (input === currentRacePin) {
         isEngineerMode = true;
-        localStorage.setItem(`stratefreez-is-engineer-${currentRaceId}`, 'true');
+        // 🚀 PASSEPORT : On mémorise la clé à vie pour cette course !
+        localStorage.setItem(`stratefreez-passport-${currentRaceId}`, 'true');
         toggleObserverMode(false);
         closePinAuthModal();
     } else {
@@ -627,8 +645,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSnapshotDropdown();
         listenToCloudRace(); // 🚀 AJOUT ICI : Relance l'écoute après un F5
 
-        // 🚀 CAHIER DES CHARGES : Vérification des droits pour cette course précise
-        isEngineerMode = localStorage.getItem(`stratefreez-is-engineer-${currentRaceId}`) === 'true';
+        // 🚀 PASSEPORT : Vérification au rafraîchissement (F5)
+        let hasPassport = localStorage.getItem(`stratefreez-passport-${currentRaceId}`) === 'true';
+        isEngineerMode = hasPassport; // On déverrouille direct si on a le passeport
         toggleObserverMode(!isEngineerMode);
 
         // Focus intelligent : On force l'onglet 3 si on était sur les paramétrages au moment du crash
@@ -684,7 +703,7 @@ function clearCurrentRaceData() {
     updateSnapshotDropdown();
     // 🚀 AJOUT ICI : On coupe l'écoute du cloud si on vide la course
     if (unsubscribeCloud) { unsubscribeCloud(); unsubscribeCloud = null; }
-    // On déverrouille l'UI par défaut pour la page d'accueil
+    // 🚀 ACCUEIL : On force l'interface en vert et ouvert
     isEngineerMode = true;
     toggleObserverMode(false);
 }
@@ -715,9 +734,9 @@ function confirmNewRace() {
     localStorage.setItem('stratefreez-current-race-pin', currentRacePin);
     localStorage.setItem('stratefreez-is-race-active', 'true');
 
-    // 🚀 CAHIER DES CHARGES : Le créateur est automatiquement Ingénieur pour CETTE course
+    // 🚀 PASSEPORT : Le créateur obtient le passeport à vie pour CETTE course
     isEngineerMode = true;
-    localStorage.setItem(`stratefreez-is-engineer-${currentRaceId}`, 'true');
+    localStorage.setItem(`stratefreez-passport-${currentRaceId}`, 'true');
 
     // Création initiale pure dans Firebase
     db.collection('races').doc(currentRaceId).set({
@@ -859,8 +878,9 @@ async function confirmSwitchRace() {
     currentRaceId = pendingSwitchRaceId;
     localStorage.setItem('stratefreez-current-race-id', currentRaceId);
 
-    // 🚀 CAHIER DES CHARGES : On vérifie si l'appareil a DÉJÀ les droits d'Ingénieur pour CETTE course
-    isEngineerMode = localStorage.getItem(`stratefreez-is-engineer-${currentRaceId}`) === 'true';
+    // 🚀 PASSEPORT : On vérifie si l'appareil a DÉJÀ les droits pour cette course
+    let hasPassport = localStorage.getItem(`stratefreez-passport-${currentRaceId}`) === 'true';
+    isEngineerMode = hasPassport;
     toggleObserverMode(!isEngineerMode);
 
     // 3. TÉLÉCHARGEMENT INITIAL DEPUIS LE CLOUD
@@ -1425,6 +1445,7 @@ function bindGlobalSyncEvents() {
 // ==========================================
 
 function startLiveTimer(splitIdx) {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     let goal = document.getElementById('race-goal')?.value;
     let raceType = document.getElementById('race-type')?.value || 'irl';
     let isOnline = (raceType === 'online');
@@ -1848,6 +1869,7 @@ function forcePitOut(splitIdx, stintIdx) {
 }
 
 function handleNavClick() {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     let str = localStorage.getItem('stratefreez-timer');
     if (str) {
         let timerState = JSON.parse(str);
@@ -1897,14 +1919,13 @@ function stopTimer(isRaceEnd) {
     }
     document.querySelectorAll('.active-live-stint').forEach(el => el.classList.remove('active-live-stint'));
 
-    // 🚀 GESTION DU CLOUD (On prévient les autres que le chrono s'arrête)
+    // 🚀 GESTION DU CLOUD (On prévient que le chrono s'arrête, MAIS le câble local reste branché)
     if (isRaceEnd) {
-        localStorage.setItem('stratefreez-is-race-active', 'false');
-        isRaceActive = false;
+        // ON NE TUE PLUS LA COURSE LOCALEMENT (isRaceActive reste true !)
 
         if (currentRaceId) {
             db.collection('races').doc(currentRaceId).update({
-                isActive: false,
+                isActive: false, // Flag serveur pour basculer dans le dossier "🏁 Terminées"
                 isTimerRunning: false,
                 timerState: null
             }).catch(e => console.error(e));
@@ -1987,6 +2008,15 @@ function confirmRestartRace() {
     saveFormState();
     renderStrategy();
     updateLiveSpotter(0, null);
+
+    // 🚀 CLOUD : On ressuscite la course pour qu'elle sorte du dossier "Terminées"
+    if (currentRaceId && isRaceActive) {
+        db.collection('races').doc(currentRaceId).update({
+            isActive: true,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(e => console.error("Erreur relance :", e));
+    }
+
     closeRestartModal();
 }
 

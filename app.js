@@ -1529,12 +1529,18 @@ function runTimerLoop() {
     liveTimerActive = true;
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
-    function loop(timestamp) {
+    // On retire le "timestamp" capricieux de l'écran
+    function loop() {
         if (!liveTimerActive) return;
 
-        if (timestamp - lastTimerTick >= 1000) {
+        // 🚀 On utilise notre propre horloge implacable
+        let now = getUnifiedTime();
+
+        if (now - lastTimerTick >= 1000) {
             timerTick();
-            lastTimerTick = timestamp;
+            // L'astuce magique : On "clipe" (snap) le tic sur la seconde ronde. 
+            // Finie la dérive, même si le processeur du mobile s'endort !
+            lastTimerTick = now - (now % 1000);
         }
         animationFrameId = requestAnimationFrame(loop);
     }

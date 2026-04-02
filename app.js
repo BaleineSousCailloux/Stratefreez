@@ -2196,6 +2196,7 @@ function confirmRestartRace() {
     if (currentRaceId && isRaceActive) {
         db.collection('races').doc(currentRaceId).update({
             isActive: true,
+            strategyData: strategySplits,
             timerState: null,
             isTimerRunning: false,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()

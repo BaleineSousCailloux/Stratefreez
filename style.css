@@ -825,7 +825,6 @@ input[type="number"]::-webkit-outer-spin-button {
 /* 1. On applique le fond clignotant à TOUTES les cellules */
 .stint-table tr.active-live-stint td {
     animation: pulse-bg-heavy 1.5s infinite !important;
-    font-weight: bold !important;
     box-shadow: none !important; /* Supprime toute ombre sur les colonnes 2, 3, 4... */
 }
 
@@ -840,11 +839,11 @@ input[type="number"]::-webkit-outer-spin-button {
 /* Moteur A : Juste la couleur de fond (pour toute la ligne) */
 @keyframes pulse-bg-heavy {
     0%, 100% {
-        background-color: rgba(27, 94, 32, 0.5);
+        background-color: rgba(27, 94, 32, 0.2);
     }
 
     50% {
-        background-color: rgba(76, 175, 80, 0.95);
+        background-color: rgba(76, 175, 80, 0.6);
     }
 }
 
@@ -856,7 +855,7 @@ input[type="number"]::-webkit-outer-spin-button {
     }
 
     50% {
-        background-color: rgba(76, 175, 80, 0.95);
+        background-color: rgba(76, 175, 80, 0.9);
         box-shadow: inset 12px 0 0 #69F0AE;
     }
 }

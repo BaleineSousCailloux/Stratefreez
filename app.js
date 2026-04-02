@@ -4638,7 +4638,7 @@ function executeLocalSave() {
     // 2. Le Videur strict (Vérifications de la Propreté de la course)
     if (!currentRaceId) {
         errorMsg = "Aucune course n'est actuellement chargée dans l'application.";
-    } else if (timerState && timerState.active) {
+    } else if (liveTimerActive) {
         errorMsg = "Le chronomètre est en cours de fonctionnement.<br><br>Vous devez d'abord l'arrêter et utiliser le bouton <strong>RACE RESET</strong> pour remettre la course à l'état Prête.";
     } else {
         // Vérifie s'il y a déjà des arrêts aux stands validés dans le tableau

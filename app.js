@@ -2184,7 +2184,6 @@ function confirmRestartRace() {
     // 2. Arrêt du Chronomètre Local
     localStorage.removeItem('stratefreez-timer');
     liveTimerActive = false;
-    timerState = null;
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
     let navTitle = document.getElementById('nav-brand-text');
@@ -4813,7 +4812,6 @@ function purgeLocalState() {
 
     // 2. Vider la mémoire de l'appareil
     liveTimerActive = false;
-    timerState = null;
 
     // 3. Nettoyer l'interface visuelle (Arrêter le clignotement)
     let navBrandText = document.getElementById('nav-brand-text');
@@ -4936,7 +4934,6 @@ function handleLocalFileSelect(event) {
 
                         formState = importedData.formState;
                         strategySplits = importedData.strategyData;
-                        timerState = null;
 
                         let navBrandText = document.getElementById('nav-brand-text');
                         if (navBrandText) {

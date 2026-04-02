@@ -817,23 +817,26 @@ input[type="number"]::-webkit-outer-spin-button {
 /* ============================================================
    SURBRILLANCE DU RELAIS EN COURS (MODE HAUTE VISIBILITÉ)
    ============================================================ */
-.active-live-stint td {
-    background-color: rgba(165, 214, 167, 0.05) !important;
-    animation: pulse-bg-heavy 1.5s infinite !important;
-    font-weight: bold !important;
-}
-
-    .active-live-stint td:first-child {
-        /* La première cellule joue les deux animations en même temps */
-        animation: pulse-bg-heavy 1.5s infinite, pulse-bar-heavy 1.5s infinite !important;
-    }
-
 .active-live-stint {
     z-index: 5;
     position: relative;
 }
 
-/* L'animation du fond (Gère 100% de la luminosité pour TOUTE la ligne) */
+    /* 1. On applique uniquement le fond clignotant à TOUTES les cellules */
+    .active-live-stint td {
+        animation: pulse-bg-heavy 1.5s infinite !important;
+        font-weight: bold !important;
+        box-shadow: none !important; /* Sécurité absolue : aucune barre sur les cellules normales */
+    }
+
+        /* 2. On applique l'animation combinée (Fond + Barre) UNIQUEMENT à la 1ère cellule */
+        .active-live-stint td:first-child {
+            animation: pulse-bg-and-bar-heavy 1.5s infinite !important;
+        }
+
+/* --- LES DEUX MOTEURS D'ANIMATION --- */
+
+/* Moteur A : Juste la couleur de fond (pour toute la ligne) */
 @keyframes pulse-bg-heavy {
     0%, 100% {
         background-color: rgba(27, 94, 32, 0.5) !important;
@@ -842,19 +845,19 @@ input[type="number"]::-webkit-outer-spin-button {
     50% {
         background-color: rgba(76, 175, 80, 0.95) !important;
     }
-    /* Flash quasi opaque */
 }
 
-/* L'animation du liseré (Gère 100% de la barre verticale pour la 1ère cellule) */
-@keyframes pulse-bar-heavy {
+/* Moteur B : La couleur de fond + Le liseré vertical (pour la 1ère cellule) */
+@keyframes pulse-bg-and-bar-heavy {
     0%, 100% {
-        box-shadow: inset 6px 0 0 #4CAF50;
+        background-color: rgba(27, 94, 32, 0.5) !important;
+        box-shadow: inset 6px 0 0 #4CAF50 !important;
     }
 
     50% {
-        box-shadow: inset 12px 0 0 #69F0AE;
+        background-color: rgba(76, 175, 80, 0.95) !important;
+        box-shadow: inset 12px 0 0 #69F0AE !important;
     }
-    /* Fini le halo interne emprisonné ! */
 }
 
 .is-historical td {

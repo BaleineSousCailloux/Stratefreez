@@ -25,18 +25,18 @@ let serverOffset = 0; // Le décalage de la carte mère en millisecondes
 async function calibrateTime() {
     try {
         let start = Date.now();
-        // On "toque" à la porte du site web pour lire son heure officielle
-        let res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' });
-        let dateHeader = res.headers.get('Date');
+        // 🚀 On interroge une vraie API d'horloge atomique qui conserve les MILLISECONDES
+        let res = await fetch('https://worldtimeapi.org/api/timezone/Etc/UTC');
+        let data = await res.json();
 
-        if (dateHeader) {
-            let serverTime = new Date(dateHeader).getTime();
-            let latency = (Date.now() - start) / 2; // On retire le temps de trajet d'internet
+        if (data && data.datetime) {
+            let serverTime = new Date(data.datetime).getTime();
+            let latency = (Date.now() - start) / 2;
             serverOffset = serverTime - (start + latency);
-            console.log("⏱️ Horloge calibrée ! Décalage local : " + serverOffset + "ms");
+            console.log("⏱️ Horloge atomique calibrée avec précision ! Décalage : " + serverOffset + "ms");
         }
     } catch (e) {
-        console.warn("⚠️ Impossible de calibrer l'horloge. Utilisation du temps local.");
+        console.warn("⚠️ Impossible de joindre l'horloge mondiale. Utilisation du temps local.");
     }
 }
 
@@ -4659,7 +4659,8 @@ function executeLocalSave() {
     let a = document.createElement('a');
 
     let raceNameInput = document.getElementById('race-name-input');
-    let safeName = (raceNameInput && raceNameInput.value) ? raceNameInput.value.replace(/[^a-z0-9A-Z_]/gi, '_') : "stratefreez_course";
+    // 🚀 Ne remplace QUE les caractères interdits par le système d'exploitation, garde les espaces !
+    let safeName = (raceNameInput && raceNameInput.value) ? raceNameInput.value.replace(/[\\/:*?"<>|]/g, '_') : "stratefreez_course";
 
     a.href = url;
     a.download = `${safeName}.json`;

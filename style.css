@@ -814,17 +814,11 @@ input[type="number"]::-webkit-outer-spin-button {
     background-color: #0f395c;
 }
 
-/*.active-live-stint td {
-    background-color: rgba(165, 214, 167, 0.05) !important;
+.active-live-stint td {
+    animation: pulse-green-heavy 1.5s infinite !important;
 }
 
-.active-live-stint {
-    animation: pulse-green 2s infinite !important;
-    z-index: 5;
-    position: relative;
-}*/
-
-.active-live-stint td {
+.active-live-stint td:first-child {
     animation: pulse-bar-heavy 1.5s infinite !important;
 }
 

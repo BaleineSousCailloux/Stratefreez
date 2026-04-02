@@ -340,7 +340,7 @@ function executeSave() {
     let name = currentFileName.trim();
 
     if (!name) {
-        alert("❌ EXPORT IMPOSSIBLE SANS NOM");
+        showErrorModal("Export impossible : la course n'a pas de nom.");
         return;
     }
 
@@ -364,46 +364,102 @@ function executeSave() {
 function openDuplicateErrorModal() { document.getElementById('duplicate-error-modal').classList.remove('hidden'); }
 function closeDuplicateErrorModal() { document.getElementById('duplicate-error-modal').classList.add('hidden'); }
 
-function duplicateRace() {
-    let name = document.getElementById('save-config-name').value.trim();
+// 🚀 NOUVELLE VERSION : Duplication Cloud (Création de Modèle Vierge) + Videur Strict
+async function duplicateRace() {
+    let newName = document.getElementById('save-config-name').value.trim();
     let currentName = document.getElementById('race-name-input').value.trim();
 
-    // Vérifie si vide OU si identique au nom actuel
-    if (!name || name === currentName) {
-        openDuplicateErrorModal();
+    // 1. Validation de base
+    if (!newName || newName === currentName) {
+        document.getElementById('duplicate-error-modal').classList.remove('hidden');
         return;
     }
 
+    // 2. 🚀 VIDEUR STRICT (Option A)
+    let isTaken = await isRaceNameTaken(newName);
+    if (isTaken) {
+        return showErrorModal("Ce nom de course est déjà utilisé sur le Cloud.<br>Veuillez en choisir un autre.");
+    }
+
+    // 3. Préparation des données (Clonage profond)
     let stateStr = localStorage.getItem('stratefreez-form-state');
     let stratStr = localStorage.getItem('stratefreez-data');
-    let config = {
-        formState: stateStr ? JSON.parse(stateStr) : {},
-        strategyData: stratStr ? JSON.parse(stratStr) : []
-    };
 
-    if (config.formState['race-name-input']) config.formState['race-name-input'] = name;
+    let clonedFormState = stateStr ? JSON.parse(stateStr) : {};
+    let clonedStrategy = stratStr ? JSON.parse(stratStr) : [];
 
-    let blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
-    let a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${name}.json`;
-    a.click();
+    // --- LA PURGE DE LA COPIE ---
+    // On s'assure que la nouvelle course est totalement vierge
+    clonedFormState['race-name-input'] = newName;
 
-    document.getElementById('save-config-name').value = '';
+    clonedStrategy.forEach(split => {
+        split.isFinished = false;
+        split.stints.forEach(stint => {
+            stint.isPitted = false;
+            stint.lockedTimeSec = null;
+            stint.manualFuel = null;
+        });
+    });
+
+    // 4. Génération des nouveaux IDs
+    let newRaceId = 'race_' + Date.now();
+    let newPin = Math.floor(1000 + Math.random() * 9000).toString();
+
+    // 5. Envoi à Firebase
+    db.collection('races').doc(newRaceId).set({
+        id: newRaceId,
+        name: newName,
+        pin: newPin,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        formState: clonedFormState,
+        strategyData: clonedStrategy,
+        timerState: null,      // Chrono purgé
+        isTimerRunning: false, // Course à l'arrêt
+        isActive: true         // Course "Prête"
+    }).then(() => {
+        // 6. Attribution immédiate des droits d'ingénieur (Passeport)
+        localStorage.setItem(`stratefreez-passport-${newRaceId}`, 'true');
+
+        // 7. Affichage du PIN dans la modale
+        document.getElementById('duplicate-new-pin').innerText = newPin;
+        document.getElementById('duplicate-success-modal').classList.remove('hidden');
+
+        // 8. Nettoyage de l'interface
+        document.getElementById('save-config-name').value = '';
+
+        // On actualise discrètement la liste des courses à rejoindre en arrière-plan
+        populateJoinDropdown();
+
+    }).catch(err => {
+        console.error("Erreur Duplication Cloud :", err);
+        showErrorModal("Erreur de connexion au serveur Firebase.");
+    });
 }
 
 function loadConfig(event) {
     const file = event.target.files[0];
     if (!file) return;
 
+    // On stocke juste le nom, mais on ne l'injecte pas encore dans l'interface
     let fileName = file.name.replace(/\.[^/.]+$/, "");
-    syncFileName(fileName);
 
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
         try {
             const data = JSON.parse(e.target.result);
             if (data.formState && data.strategyData) {
+
+                // 🚀 VIDEUR STRICT
+                let isTaken = await isRaceNameTaken(fileName);
+                if (isTaken) {
+                    showErrorModal("Le nom de ce fichier correspond à une course déjà existante sur le Cloud.<br><br>Renommez votre fichier sur votre ordinateur avant de l'importer.");
+                    return; // On bloque tout
+                }
+
+                // ✅ Le nom est validé : on l'injecte maintenant dans l'interface !
+                syncFileName(fileName);
+
                 data.strategyData.forEach(split => {
                     if (split.stints) {
                         split.stints.forEach(stint => {
@@ -439,29 +495,20 @@ function loadConfig(event) {
                     }
                 }
 
-                // 🚀 CORRECTION VITESSE 3 : On supprime 'isHardCascade' pour 
-                // laisser le moteur respecter les choix "Hors Fenêtre" du fichier.
                 cascadeFixPitWindows();
                 if (needsCatchup) cascadeFixPitWindows();
 
-                // 🚀 CORRECTION D'IMPORT : On sauvegarde et on verrouille le "Cerveau" 
-                // pour que l'onglet ne tente pas de recalculer ou d'écraser la strat importée.
                 saveFormState();
                 lastCalculatedState = localStorage.getItem('stratefreez-form-state');
-
-                // 🚀 CORRECTION D'IMPORT : Forçage de l'affichage immédiat du tableau.
-                // Cela mettra aussi à jour instantanément la ligne verte si le chrono est lancé !
                 renderStrategy();
-
-                /*setSaveBadge(true);*/
                 openTab('tab-strategy');
 
             } else {
-                alert("Fichier non valide : structure incorrecte.");
+                showErrorModal("Fichier non valide : structure incorrecte.");
             }
         } catch (err) {
             console.error("Erreur Import:", err);
-            alert("Erreur de lecture du fichier : " + err.message);
+            showErrorModal("Erreur de lecture du fichier : " + err.message);
         }
         event.target.value = '';
     };
@@ -713,6 +760,29 @@ function updatePinDisplay() {
     }
 }
 
+// 🚀 LE VIDEUR STRICT (Option A) : Vérifie si le nom existe déjà sur le Cloud
+async function isRaceNameTaken(nameToCheck) {
+    try {
+        const snapshot = await db.collection('races').where('name', '==', nameToCheck).get();
+        return !snapshot.empty;
+    } catch (error) {
+        console.error("Erreur vérification doublon :", error);
+        return false;
+    }
+}
+
+// 🚀 NOUVEAU : Remplaçant universel des alert() natifs
+function showErrorModal(msg) {
+    let msgEl = document.getElementById('generic-error-msg');
+    let modal = document.getElementById('generic-error-modal');
+    if (msgEl && modal) {
+        msgEl.innerHTML = msg;
+        modal.classList.remove('hidden');
+    } else {
+        alert(msg); // Sécurité de repli
+    }
+}
+
 function clearCurrentRaceData() {
     currentRaceId = null;
     currentRacePin = null;
@@ -749,14 +819,27 @@ function closeNewRaceModal() {
     document.getElementById('new-race-modal').classList.add('hidden');
 }
 
-function confirmNewRace() {
+async function confirmNewRace() {
     let raceName = document.getElementById('new-race-input').value.trim();
-    if (!raceName) return alert("Veuillez saisir un nom pour l'épreuve.");
+    let errorEl = document.getElementById('new-race-error');
 
-    let currentName = document.getElementById('race-name-input')?.value.trim();
-    if (raceName === currentName) return alert("Ce nom est déjà utilisé par la course actuellement ouverte.");
+    if (!raceName) {
+        if (errorEl) { errorEl.innerText = "Veuillez saisir un nom."; errorEl.classList.remove('hidden'); }
+        return;
+    }
+
+    // 🚀 VIDEUR STRICT
+    let isTaken = await isRaceNameTaken(raceName);
+    if (isTaken) {
+        if (errorEl) { errorEl.innerText = "Ce nom existe déjà sur le Cloud."; errorEl.classList.remove('hidden'); }
+        return;
+    }
+
+    if (errorEl) errorEl.classList.add('hidden'); // On cache l'erreur si tout va bien
 
     clearCurrentRaceData();
+    // ... la suite reste identique
+    if (typeof purgeLocalState === 'function') purgeLocalState();
 
     currentRaceId = 'race_' + Date.now();
     currentRacePin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -850,6 +933,8 @@ async function populateJoinDropdown() {
 
         // 3. Construction des balises HTML <optgroup>
         select.innerHTML = '<option value="">-- Choisir une course --</option>';
+        // 🚀 AJOUT IDÉE 2 : Le bouton de déconnexion / retour à l'accueil
+        select.insertAdjacentHTML('beforeend', '<option value="NEW_SESSION" class="text-success font-weight-bold">🏠 [ + ] FERMER LA SESSION (Retour Accueil)</option>');
 
         if (enCours.length > 0) {
             let groupEnCours = document.createElement('optgroup');
@@ -880,9 +965,22 @@ async function populateJoinDropdown() {
 
 function triggerSwitchRace(raceId) {
     if (!raceId) return;
-    pendingSwitchRaceId = raceId;
+
     let select = document.getElementById('join-race-select');
     let btn = document.getElementById('btn-show-join');
+
+    // 🚀 GESTION IDÉE 2 : FERMETURE DE SESSION
+    if (raceId === 'NEW_SESSION') {
+        if (select) { select.value = ""; select.classList.add('hidden'); }
+        if (btn) btn.classList.remove('hidden');
+
+        clearCurrentRaceData();
+        if (typeof purgeLocalState === 'function') purgeLocalState(); // Sécurité : on tue le chrono local
+        openTab('tab-params');
+        return;
+    }
+
+    pendingSwitchRaceId = raceId;
 
     document.getElementById('switch-race-name').innerText = select.options[select.selectedIndex].text;
     document.getElementById('switch-race-modal').classList.remove('hidden');
@@ -2019,22 +2117,43 @@ function closeExcessModal() {
 }
 
 // 🚀 NOUVELLE FONCTION : Le Vrai Reset (Relancer la course)
-function openRestartModal() { document.getElementById('restart-modal').classList.remove('hidden'); }
-function closeRestartModal() { document.getElementById('restart-modal').classList.add('hidden'); }
+// 🚀 NOUVELLE FONCTION : Le Vrai Reset (Relancer la course)
+function openRestartModal() {
+    let input = document.getElementById('reset-confirm-input');
+    let btn = document.getElementById('btn-confirm-reset');
+    if (input) input.value = "";
+    if (btn) btn.disabled = true; // Verrouillage natif
+
+    document.getElementById('restart-modal').classList.remove('hidden');
+    if (input) setTimeout(() => input.focus(), 100);
+}
+
+function closeRestartModal() {
+    document.getElementById('restart-modal').classList.add('hidden');
+}
+
+function checkResetInput() {
+    let input = document.getElementById('reset-confirm-input');
+    let btn = document.getElementById('btn-confirm-reset');
+    if (input && btn) {
+        btn.disabled = (input.value.trim().toUpperCase() !== "RESET");
+    }
+}
 
 function confirmRestartRace() {
     strategySplits.forEach(split => {
-        split.isFinished = false; // On retire le drapeau de fin
+        split.isFinished = false;
         split.stints.forEach(stint => {
             stint.isPitted = false;
             stint.lockedTimeSec = null;
-            stint.manualFuel = null; // Vrai reset des calculs auto
+            stint.manualFuel = null;
         });
     });
 
     localStorage.removeItem('stratefreez-timer');
     liveTimerActive = false;
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    timerState = null;
 
     let navTitle = document.getElementById('nav-brand-text');
     if (navTitle) {
@@ -2047,10 +2166,12 @@ function confirmRestartRace() {
     renderStrategy();
     updateLiveSpotter(0, null);
 
-    // 🚀 CLOUD : On ressuscite la course pour qu'elle sorte du dossier "Terminées"
+    // 🚀 CLOUD : On ressuscite la course, on coupe le chrono serveur
     if (currentRaceId && isRaceActive) {
         db.collection('races').doc(currentRaceId).update({
             isActive: true,
+            timerState: null,
+            isTimerRunning: false,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }).catch(e => console.error("Erreur relance :", e));
     }
@@ -2571,7 +2692,11 @@ function closePitModal() {
 function confirmPitIn() {
     if (pitModalTarget) {
         let inputLap = parseInt(document.getElementById('pit-modal-lap').value);
+        let errorEl = document.getElementById('pit-error-msg');
+
         if (inputLap && inputLap > pitModalTarget.startLap) {
+            if (errorEl) errorEl.classList.add('hidden');
+
             let realLaps = inputLap - pitModalTarget.startLap;
             let sIdx = pitModalTarget.splitIdx;
             let stIdx = pitModalTarget.stintIdx;
@@ -2597,7 +2722,11 @@ function confirmPitIn() {
             renderStrategy();
             closePitModal();
         } else {
-            alert("Le tour d'arrêt doit être strictement supérieur au tour de départ du relais.");
+            // 🚀 ERREUR IN-MODAL au lieu de l'alert()
+            if (errorEl) {
+                errorEl.innerText = "Le tour doit être strictement supérieur au départ du relais.";
+                errorEl.classList.remove('hidden');
+            }
         }
     }
 }
@@ -4192,7 +4321,16 @@ function generateIARequest() {
 function copyIARequest() {
     if (!checkExportSecurity()) return;
     let text = document.getElementById('ia-prompt-preview').value;
-    navigator.clipboard.writeText(text).then(() => { alert("Requête copiée dans le presse-papier !"); });
+    navigator.clipboard.writeText(text).then(() => {
+        let btn = document.getElementById('btn-export-copy');
+        let oldHTML = btn.innerHTML;
+        btn.innerHTML = `<span class="material-symbols-outlined icon-sm icon-align-middle">check</span> Copié`;
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerHTML = oldHTML;
+            btn.classList.remove('btn-success');
+        }, 2000);
+    });
 }
 
 function downloadIAJson() {
@@ -4622,6 +4760,28 @@ function restoreSnapshot(idx) {
 }
 
 // ==========================================
+// --- SAS DE DÉCONTAMINATION LOCALE ---
+// ==========================================
+function purgeLocalState() {
+    // 1. Tuer le moteur du chrono visuel
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
+
+    // 2. Vider la mémoire de l'appareil
+    liveTimerActive = false;
+    timerState = null;
+
+    // 3. Nettoyer l'interface visuelle (Arrêter le clignotement)
+    let navBrandText = document.getElementById('nav-brand-text');
+    if (navBrandText) {
+        navBrandText.classList.remove('chrono-active');
+        navBrandText.innerText = "STRATEFREEZ";
+    }
+}
+
+// ==========================================
 // --- SAUVEGARDE LOCALE (.JSON) ---
 // ==========================================
 function executeLocalSave() {
@@ -4683,15 +4843,25 @@ function handleLocalFileSelect(event) {
     if (!file) return;
 
     let reader = new FileReader();
-    reader.onload = function (e) {
+    // 🚀 AJOUT DE 'async' ICI
+    reader.onload = async function (e) {
         try {
             let importedData = JSON.parse(e.target.result);
 
             if (importedData.formState && importedData.strategyData) {
                 let newName = file.name.replace(/\.[^/.]+$/, "");
-                importedData.formState['race-name-input'] = newName; // On force le nouveau nom
+
+                // 🚀 LE VIDEUR STRICT EST MAINTENANT ACTIF ICI AUSSI !
+                let isTaken = await isRaceNameTaken(newName);
+                if (isTaken) {
+                    showErrorModal("Le nom de ce fichier correspond à une course déjà existante sur le Cloud.<br><br>Renommez votre fichier sur votre ordinateur avant de l'importer.");
+                    return;
+                }
+
+                importedData.formState['race-name-input'] = newName;
 
                 // Création des nouveaux IDs
+                purgeLocalState();
                 let newRaceId = 'race_' + Date.now();
                 let newPin = Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -4759,13 +4929,13 @@ function handleLocalFileSelect(event) {
                     })
                     .catch(error => {
                         console.error("Erreur création Cloud :", error);
-                        alert("Erreur de connexion au serveur Firebase.");
+                        showErrorModal("Erreur de connexion au serveur Firebase.");
                     });
             } else {
-                alert("Le fichier JSON n'est pas un export valide de Stratefreez.");
+                showErrorModal("Le fichier JSON n'est pas un export valide de Stratefreez.");
             }
         } catch (err) {
-            alert("Erreur de lecture du fichier JSON.");
+            showErrorModal("Erreur de lecture du fichier JSON.");
         }
     };
     reader.readAsText(file);

@@ -545,15 +545,12 @@
             <p>Confirmez le tour d'arrêt</p>
             <p>La validation fixera l'heure d'arrêt</p>
             <p id="modal-force-pit-text" class="text-amber fs-09 hidden">Forcer Auto-PIT = Valider le prévisionnel</p>
-
             <input type="number" id="pit-modal-lap" class="modal-input-large" onkeydown="if(event.key==='Enter'){confirmPitIn();}">
-
+            <p id="pit-error-msg" class="text-danger hidden m-0 mt-5 mb-15 text-center fs-09"></p>
             <div class="modal-triple-buttons-container">
-
                 <button class="triple-btn btn-grey" onclick="closePitModal()">
                     Annuler
                 </button>
-
                 <button id="modal-btn-force-pit" class="triple-btn btn-amber hidden" onclick="confirmForceAutoPit()">
                     <div class="force-btn-content">
                         <div class="force-btn-line1">
@@ -562,12 +559,10 @@
                         <div class="force-btn-line2">Auto-PIT</div>
                     </div>
                 </button>
-
                 <button class="triple-btn magic-btn" onclick="confirmPitIn()">
                     VALIDER
                 </button>
             </div>
-
         </div>
     </div>
     <div id="undo-pit-modal" class="modal hidden"><div class="modal-content border-top-success"><h3 class="modal-title-green">⏪ ANNULER LE PIT IN</h3><p>Combien de tours aviez-vous prévu de faire initialement ?</p><input type="number" id="undo-pit-modal-lap" class="modal-input-large" onkeydown="if(event.key==='Enter'){confirmUndoPit();}"><div class="justify-space-around d-flex"><button class="action-btn btn-grey" onclick="closeUndoPitModal()">Annuler</button><button class="action-btn btn-success" onclick="confirmUndoPit()">DÉVERROUILLER</button></div></div></div>
@@ -597,14 +592,17 @@
     </div>
     <div id="restart-modal" class="modal hidden">
         <div class="modal-content border-top-warning modal-wide">
-            <h3 class="modal-title-red" style="color: #ffb74d;">⚠️ RELANCER LA COURSE</h3>
-            <p class="modal-confirm-text mt-15 mb-20" style="font-weight: normal;">
-                Voulez-vous relancer la course ?<br><br>
-                Cela déverrouillera tous les relais et supprimera les ajustements manuels d'essence, mais conservera votre stratégie de gommes.
+            <h3 class="modal-title-red text-warning">⚠️ RELANCER LA COURSE</h3>
+            <p class="modal-confirm-text mt-15 mb-20 text-left" style="font-weight: normal;">
+                Voulez-vous réinitialiser le suivi de cette course ?<br><br>
+                <span class="text-warning">SERONT PURGÉS :</span> Les arrêts aux stands validés, le chrono, les ajustements d'essence et le statut "Terminée".<br>
+                <span class="text-success">SERONT CONSERVÉS :</span> L'ossature de votre stratégie (tours, gommes, cibles).<br><br>
+                Pour confirmer, veuillez taper le mot <strong>RESET</strong> ci-dessous :
             </p>
+            <input type="text" id="reset-confirm-input" class="export-input w-100 mb-20 text-center" placeholder="Tapez RESET" autocomplete="off" oninput="checkResetInput()">
             <div class="justify-space-around d-flex">
                 <button class="action-btn btn-grey" onclick="closeRestartModal()">Annuler</button>
-                <button class="action-btn btn-warning" onclick="confirmRestartRace()">RELANCER</button>
+                <button id="btn-confirm-reset" class="action-btn btn-warning" onclick="confirmRestartRace()" disabled>PURGER LA COURSE</button>
             </div>
         </div>
     </div>
@@ -613,6 +611,7 @@
             <h3 class="modal-title-red" style="color: #cc2d53;">🏁 NOUVELLE COURSE</h3>
             <p>Saisissez le nom de l'épreuve :</p>
             <input type="text" id="new-race-input" placeholder="Ex: Nurb_24h" class="modal-input-text" onkeydown="if(event.key==='Enter'){confirmNewRace();}">
+            <p id="new-race-error" class="text-danger hidden m-0 mt-5 text-center"></p>
             <div class="modal-btn-group mt-15">
                 <button class="action-btn btn-grey" onclick="closeNewRaceModal()">Annuler</button>
                 <button class="action-btn magic-btn" onclick="confirmNewRace()">CRÉER</button>
@@ -654,6 +653,20 @@
             </div>
         </div>
     </div>
+    <div id="duplicate-success-modal" class="modal hidden">
+        <div class="modal-content border-top-success modal-wide">
+            <h3 class="modal-title-green">✅ COURSE DUPLIQUÉE</h3>
+            <p class="modal-confirm-text mt-15 mb-20" style="font-weight: normal;">
+                Une copie "vierge" de cette stratégie a été créée sur le Cloud.<br><br>
+                Code PIN de la copie : <strong id="duplicate-new-pin" class="text-success fs-1-25">----</strong><br>
+                <small class="text-grey">(Notez-le pour le partager à vos ingénieurs)</small>
+            </p>
+            <p class="help-text text-left">Vous restez sur la course actuelle. Vous retrouverez votre copie dans le menu <strong>"Rejoindre une course"</strong>.</p>
+            <div class="justify-center d-flex mt-20">
+                <button class="action-btn btn-success w-120" onclick="document.getElementById('duplicate-success-modal').classList.add('hidden')">Parfait</button>
+            </div>
+        </div>
+    </div>
     <div id="pin-auth-modal" class="modal hidden">
         <div class="modal-content border-top-success">
             <h3 class="modal-title-green">🔒 DÉVERROUILLAGE</h3>
@@ -663,6 +676,15 @@
             <div class="modal-btn-group mt-15">
                 <button class="action-btn btn-grey" onclick="closePinAuthModal()">Annuler</button>
                 <button class="action-btn btn-success" onclick="confirmPinAuth()">DÉVERROUILLER</button>
+            </div>
+        </div>
+    </div>
+    <div id="generic-error-modal" class="modal hidden">
+        <div class="modal-content border-top-danger">
+            <h3 class="modal-title-red">❌ ERREUR</h3>
+            <p id="generic-error-msg" class="modal-confirm-text mt-15 mb-20" style="font-weight: normal; font-size: 1.1em;"></p>
+            <div class="justify-center d-flex mt-20">
+                <button class="action-btn btn-danger w-120" onclick="document.getElementById('generic-error-modal').classList.add('hidden')">Compris</button>
             </div>
         </div>
     </div>

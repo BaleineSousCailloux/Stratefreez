@@ -2167,43 +2167,58 @@ function checkResetInput() {
 }
 
 function confirmRestartRace() {
+    if (!currentRaceId) return;
+
+    // 1. Déverrouillage des relais (On garde l'architecture exacte, on nettoie juste les statuts)
     strategySplits.forEach(split => {
-        split.isFinished = false;
+        split.isFinished = false; // Retire le statut "Terminé" localement
         split.stints.forEach(stint => {
             stint.isPitted = false;
             stint.lockedTimeSec = null;
             stint.manualFuel = null;
+            stint.pitExitForced = false;
+            stint.locked = false;
         });
     });
 
+    // 2. Arrêt du Chronomètre Local
     localStorage.removeItem('stratefreez-timer');
     liveTimerActive = false;
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
     timerState = null;
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
     let navTitle = document.getElementById('nav-brand-text');
     if (navTitle) {
         navTitle.innerText = "STRATEFREEZ";
-        navTitle.className = 'nav-brand';
+        navTitle.classList.remove('chrono-active');
     }
 
+    // 3. Forcer l'état actif localement
+    isRaceActive = true;
+    localStorage.setItem('stratefreez-is-race-active', 'true');
+
+    // 4. Recalcul et Sauvegarde Locale
     cascadeFixPitWindows();
     saveFormState();
     renderStrategy();
     updateLiveSpotter(0, null);
 
-    // 🚀 CLOUD : On ressuscite la course, on coupe le chrono serveur
-    if (currentRaceId && isRaceActive) {
-        db.collection('races').doc(currentRaceId).update({
-            isActive: true,
-            strategyData: strategySplits,
-            timerState: null,
-            isTimerRunning: false,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(e => console.error("Erreur relance :", e));
-    }
-
-    closeRestartModal();
+    // 5. 🚀 LE CLOUD : On pousse le tableau sans pit validé et on coupe les statuts de fin/chrono
+    db.collection('races').doc(currentRaceId).update({
+        isActive: true,
+        strategyData: strategySplits, // Le tableau avec ses micro-stints intacts
+        timerState: null,
+        isTimerRunning: false,
+        isRaceTerminated: false, // 🚀 C'est ceci qui la classe en "Course Prête"
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        closeRestartModal();
+        let banner = document.getElementById('end-race-banner');
+        if (banner) banner.classList.add('hidden');
+    }).catch(e => {
+        console.error("Erreur relance :", e);
+        showErrorModal("Erreur de communication avec le serveur lors du Reset.");
+    });
 }
 
 function openClearModal() { document.getElementById('clear-modal').classList.remove('hidden'); }

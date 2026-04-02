@@ -2603,8 +2603,10 @@ body.observer-locked #form-tech,
 body.observer-locked #tab-strategy select,
 body.observer-locked #tab-strategy input,
 body.observer-locked .live-action-area button,
-body.observer-locked #tab-export .export-card.border-danger, /* Dupliquer/Supprimer */
-body.observer-locked #tab-export .btn-import /* Snapshots */ {
+body.observer-locked #tab-export .export-card, /* 🚀 Bloque TOUTES les cartes (IA, Print, JSON, CSV...) */
+body.observer-locked #tab-export button, /* 🚀 Bloque TOUS les boutons (Snapshots, etc.) */
+body.observer-locked #tab-export select, /* 🚀 Bloque la liste déroulante des snapshots */
+body.observer-locked #tab-export input /* 🚀 Bloque les champs de nom et d'importation */ {
     pointer-events: none !important;
     opacity: 0.6 !important;
 }

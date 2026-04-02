@@ -824,7 +824,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* 1. On applique le fond clignotant à TOUTES les cellules */
 .active-live-stint td {
-    animation: pulse-bg-heavy 1.5s infinite !important;
+    animation: pulse-bg-heavy 2s infinite !important;
 }
 
 /* --- LES DEUX MOTEURS D'ANIMATION --- */
@@ -837,7 +837,7 @@ input[type="number"]::-webkit-outer-spin-button {
     }
 
     50% {
-        background-color: rgba(76, 175, 80, 0.21);
+        background-color: rgba(76, 175, 80, 0.15);
     }
 }
 

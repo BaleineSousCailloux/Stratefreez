@@ -821,7 +821,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
     /* 🚀 NOUVEAU : La barre verticale s'ajoute UNIQUEMENT sur la première cellule tout à gauche */
     .active-live-stint td:first-child {
-        animation: pulse-bg-heavy 1.5s infinite, pulse-bar-heavy 1.5s infinite !important;
+        animation: pulse-bar-heavy 1.5s infinite !important;
     }
 
 .active-live-stint {

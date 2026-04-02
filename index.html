@@ -467,6 +467,28 @@
 
                 </div>
 
+                <h3 class="section-title mt-40"><span class="material-symbols-outlined icon-align-middle mr-8">save</span>SAUVEGARDE LOCALE (.json)</h3>
+                <div class="d-flex flex-wrap justify-space-between align-start">
+
+                    <div class="export-card flex-1 min-w-300">
+                        <h3 class="modal-title-red w-100 m-0"><span class="material-symbols-outlined icon-align-middle mr-8">download</span>Sauvegarder la course</h3>
+                        <p class="help-text text-left mt-10">Exporte la course actuelle vers un fichier. La course doit être arrêtée et sans aucun relais validé.</p>
+
+                        <label for="local-save-name" class="w-100 text-left fs-085 text-grey">Course actuellement chargée :</label>
+                        <input type="text" id="local-save-name" class="export-input" readonly placeholder="Aucune course..." style="color: #888; background-color: #222; border-color: #444;">
+
+                        <button class="action-btn btn-export-csv w-100 mt-10" onclick="executeLocalSave()">Sauvegarder (.json)</button>
+                    </div>
+
+                    <div class="export-card flex-1 min-w-300">
+                        <h3 class="modal-title-green w-100 m-0"><span class="material-symbols-outlined icon-align-middle mr-8">upload</span>Charger une course</h3>
+                        <p class="help-text text-left mt-10">Charge un ancien fichier JSON. Cela créera instantanément une nouvelle course "Prête" sur le Cloud.</p>
+
+                        <input type="file" id="local-load-file" accept=".json" class="hidden" onchange="handleLocalFileSelect(event)">
+                        <button class="action-btn btn-import w-100 mt-auto" onclick="document.getElementById('local-load-file').click()">Parcourir et Charger (.json)</button>
+                    </div>
+                </div>
+
                 <h3 class="section-title-grey mt-25">🛠️ OUTILS & EXPORTS</h3>
                 <div class="d-flex gap-20 flex-wrap mt-20">
 
@@ -553,7 +575,15 @@
     <div id="delete-modal" class="modal hidden"><div class="modal-content border-top-danger"><p class="modal-confirm-text">Supprimer cette ligne ?</p><div class="modal-btn-group mt-20"><button class="action-btn btn-grey" onclick="closeDeleteModal()">Annuler</button><button class="action-btn btn-danger" onclick="confirmDeleteRow()">SUPPRIMER</button></div></div></div>
     <div id="clear-modal" class="modal hidden"><div class="modal-content border-top-danger"><p class="modal-confirm-text">🗑️ Vider le tableau</p><div class="modal-btn-group mt-20"><button class="action-btn btn-grey" onclick="closeClearModal()">Annuler</button><button class="action-btn btn-danger" onclick="confirmClearStrategy()">CONFIRMER</button></div></div></div>
     <div id="bilan-modal" class="modal hidden"><div class="modal-content border-top-success modal-wide"><p class="modal-confirm-text">📋 CHECK RÉGLEMENTATION</p><div id="bilan-content" class="bilan-content-box"></div><div class="d-flex justify-center mt-20"><button class="action-btn btn-grey" onclick="closeBilanModal()">Fermer</button></div></div></div>
-    <div id="export-error-modal" class="modal hidden"><div class="modal-content border-top-danger"><h3 class="modal-title-red">❌ EXPORT IMPOSSIBLE</h3><p class="help-text">Veuillez corriger les alertes en rouge dans le suivi de course avant d'exporter.</p><div class="d-flex justify-center mt-20"><button class="action-btn btn-danger w-120" onclick="closeExportErrorModal()">Compris</button></div></div></div>
+    <div id="export-error-modal" class="modal hidden">
+        <div class="modal-content border-top-danger">
+            <h3 class="modal-title-red">❌ EXPORT IMPOSSIBLE</h3>
+            <p id="export-error-msg" class="help-text mt-15 mb-20" style="line-height: 1.5;">Veuillez corriger les alertes en rouge dans le suivi de course avant d'exporter.</p>
+            <div class="d-flex justify-center mt-20">
+                <button class="action-btn btn-danger w-120" onclick="closeExportErrorModal()">Compris</button>
+            </div>
+        </div>
+    </div>
     <div id="excess-stint-modal" class="modal hidden">
         <div class="modal-content border-top-danger modal-wide">
             <h3 class="modal-title-red">⚠️ ACTION IMPOSSIBLE</h3>

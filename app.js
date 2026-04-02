@@ -4104,6 +4104,12 @@ function renderStrategy() {
     if (window.pendingExcessData) {
         openExcessModal();
     }
+    // 🚀 MAJ de la case Export Local
+    let localSaveInput = document.getElementById('local-save-name');
+    if (localSaveInput) {
+        let raceNameInput = document.getElementById('race-name-input');
+        localSaveInput.value = (currentRaceId && raceNameInput) ? raceNameInput.value : "";
+    }
 }
 
 function checkExportSecurity() {
@@ -4605,4 +4611,153 @@ function restoreSnapshot(idx) {
     document.getElementById('snapshot-select').value = ""; // Reset du select
     openTab('tab-strategy'); // On bascule sur la stratégie pour voir le résultat
 }
-// Assurez-vous qu'il n'y a absolument aucun autre caractère ou accolade après cette ligne.
+
+// ==========================================
+// --- SAUVEGARDE LOCALE (.JSON) ---
+// ==========================================
+function executeLocalSave() {
+    // 1. Vérification de la Légalité (Votre fonction existante !)
+    // Si la course contient des erreurs rouges, la fonction bloque et ouvre la modale.
+    if (!checkExportSecurity()) {
+        // On s'assure de remettre le texte par défaut pour les erreurs de règles
+        document.getElementById('export-error-msg').innerHTML = "Veuillez corriger les alertes en rouge dans le suivi de course avant d'exporter.";
+        return;
+    }
+
+    let errorMsg = "";
+
+    // 2. Le Videur strict (Vérifications de la Propreté de la course)
+    if (!currentRaceId) {
+        errorMsg = "Aucune course n'est actuellement chargée dans l'application.";
+    } else if (timerState && timerState.active) {
+        errorMsg = "Le chronomètre est en cours de fonctionnement.<br><br>Vous devez d'abord l'arrêter et utiliser le bouton <strong>RACE RESET</strong> pour remettre la course à l'état Prête.";
+    } else {
+        // Vérifie s'il y a déjà des arrêts aux stands validés dans le tableau
+        let hasPits = strategySplits.some(split => split.stints.some(stint => stint.isPitted));
+        if (hasPits) {
+            errorMsg = "La course est terminée ou contient des arrêts aux stands validés.<br><br>Utilisez le bouton <strong>RACE RESET</strong> pour remettre la course à l'état Prête.";
+        }
+    }
+
+    // 3. Affichage de la modale si la course n'est pas "propre"
+    if (errorMsg) {
+        document.getElementById('export-error-msg').innerHTML = errorMsg;
+        document.getElementById('export-error-modal').classList.remove('hidden');
+        return;
+    }
+
+    // 4. Exportation (Si Légal ET Propre)
+    saveFormState();
+    let exportData = {
+        formState: formState,
+        strategyData: strategySplits
+    };
+
+    let dataStr = JSON.stringify(exportData, null, 2);
+    let blob = new Blob([dataStr], { type: "application/json" });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement('a');
+
+    let raceNameInput = document.getElementById('race-name-input');
+    let safeName = (raceNameInput && raceNameInput.value) ? raceNameInput.value.replace(/[^a-z0-9A-Z_]/gi, '_') : "stratefreez_course";
+
+    a.href = url;
+    a.download = `${safeName}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+function handleLocalFileSelect(event) {
+    let file = event.target.files[0];
+    if (!file) return;
+
+    let reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            let importedData = JSON.parse(e.target.result);
+
+            if (importedData.formState && importedData.strategyData) {
+                let newName = file.name.replace(/\.[^/.]+$/, "");
+                importedData.formState['race-name-input'] = newName; // On force le nouveau nom
+
+                // Création des nouveaux IDs
+                let newRaceId = 'race_' + Date.now();
+                let newPin = Math.floor(1000 + Math.random() * 9000).toString();
+
+                let newRaceData = {
+                    id: newRaceId,
+                    name: newName,
+                    pin: newPin,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    formState: importedData.formState,
+                    strategyData: importedData.strategyData,
+                    timerState: null,
+                    isTimerRunning: false,
+                    isActive: true
+                };
+
+                // Envoi Firebase
+                db.collection('races').doc(newRaceId).set(newRaceData)
+                    .then(() => {
+                        // Bascule de l'interface sur la nouvelle course
+                        currentRaceId = newRaceId;
+                        currentRacePin = newPin;
+                        isRaceActive = true;
+                        isEngineerMode = true;
+
+                        localStorage.setItem('stratefreez-current-race-id', currentRaceId);
+                        localStorage.setItem('stratefreez-current-race-pin', currentRacePin);
+                        localStorage.setItem('stratefreez-is-race-active', 'true');
+                        localStorage.setItem(`stratefreez-passport-${currentRaceId}`, 'true');
+
+                        formState = importedData.formState;
+                        strategySplits = importedData.strategyData;
+                        timerState = null;
+
+                        let navBrandText = document.getElementById('nav-brand-text');
+                        if (navBrandText) {
+                            navBrandText.classList.remove('chrono-active');
+                            navBrandText.innerText = "STRATEFREEZ";
+                        }
+
+                        // Injection dans le DOM
+                        applyFormStateToDOM(importedData.formState);
+                        renderStrategy();
+                        toggleObserverMode(false);
+
+                        // On relance le radar réseau sur la nouvelle course
+                        listenToCloudRace();
+
+                        openTab('tab-strategy');
+
+                        // Message de succès
+                        let banner = document.getElementById('end-race-banner');
+                        if (banner) {
+                            let oldText = banner.innerText;
+                            let oldBg = banner.style.background;
+                            banner.innerText = "Course chargée avec succès sur le Cloud !";
+                            banner.style.background = "#2196F3";
+                            banner.classList.remove('hidden');
+                            setTimeout(() => {
+                                banner.classList.add('hidden');
+                                banner.style.background = oldBg;
+                                banner.innerText = oldText;
+                            }, 4000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Erreur création Cloud :", error);
+                        alert("Erreur de connexion au serveur Firebase.");
+                    });
+            } else {
+                alert("Le fichier JSON n'est pas un export valide de Stratefreez.");
+            }
+        } catch (err) {
+            alert("Erreur de lecture du fichier JSON.");
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+}

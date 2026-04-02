@@ -825,13 +825,7 @@ input[type="number"]::-webkit-outer-spin-button {
 /* 1. On applique le fond clignotant à TOUTES les cellules */
 .stint-table tr.active-live-stint td {
     animation: pulse-bg-heavy 1.5s infinite !important;
-    box-shadow: none !important; /* Supprime toute ombre sur les colonnes 2, 3, 4... */
 }
-
-    /* 2. On applique l'animation combinée (Fond + Barre) UNIQUEMENT à la 1ère cellule */
-    .stint-table tr.active-live-stint td:first-child {
-        animation: pulse-bg-and-bar-heavy 1.5s infinite !important;
-    }
 
 /* --- LES DEUX MOTEURS D'ANIMATION --- */
 /* (Attention : on ne met JAMAIS de !important ici, sinon le navigateur fait crasher l'animation) */
@@ -839,24 +833,11 @@ input[type="number"]::-webkit-outer-spin-button {
 /* Moteur A : Juste la couleur de fond (pour toute la ligne) */
 @keyframes pulse-bg-heavy {
     0%, 100% {
-        background-color: rgba(27, 94, 32, 0.2);
+        background-color: rgba(27, 94, 32, 0.1);
     }
 
     50% {
-        background-color: rgba(76, 175, 80, 0.6);
-    }
-}
-
-/* Moteur B : La couleur de fond + Le liseré vertical (pour la 1ère cellule) */
-@keyframes pulse-bg-and-bar-heavy {
-    0%, 100% {
-        background-color: rgba(27, 94, 32, 0.5);
-        box-shadow: inset 6px 0 0 #4CAF50;
-    }
-
-    50% {
-        background-color: rgba(76, 175, 80, 0.9);
-        box-shadow: inset 12px 0 0 #69F0AE;
+        background-color: rgba(76, 175, 80, 0.4);
     }
 }
 

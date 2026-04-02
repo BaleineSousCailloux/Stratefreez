@@ -814,12 +814,23 @@ input[type="number"]::-webkit-outer-spin-button {
     background-color: #0f395c;
 }
 
-.active-live-stint td {
+/*.active-live-stint td {
     background-color: rgba(165, 214, 167, 0.05) !important;
 }
 
 .active-live-stint {
     animation: pulse-green 2s infinite !important;
+    z-index: 5;
+    position: relative;
+}*/
+
+.active-live-stint td {
+    /* L'animation est appliquée directement sur les cellules pour un fond parfait */
+    animation: pulse-green-heavy 1.5s infinite !important;
+    font-weight: bold !important; /* Maintient le texte lisible quand le fond s'éclaire */
+}
+
+.active-live-stint {
     z-index: 5;
     position: relative;
 }
@@ -1993,7 +2004,7 @@ svg.live-grey-icon {
     }
 }
 
-@keyframes pulse-green {
+/*@keyframes pulse-green {
     0% {
         box-shadow: inset 4px 0 0 #a5d6a7, inset 0 0 5px rgba(165,214,167,0.1);
     }
@@ -2004,6 +2015,17 @@ svg.live-grey-icon {
 
     100% {
         box-shadow: inset 4px 0 0 #a5d6a7, inset 0 0 5px rgba(165,214,167,0.1);
+    }
+}*/
+@keyframes pulse-green-heavy {
+    0%, 100% {
+        background-color: rgba(27, 94, 32, 0.5) !important; /* Vert sombre de base pour garder le contraste */
+        box-shadow: inset 6px 0 0 #4CAF50; /* Liseré permanent à gauche */
+    }
+
+    50% {
+        background-color: rgba(76, 175, 80, 0.85) !important; /* Vert flash quasiment opaque au pic */
+        box-shadow: inset 12px 0 0 #69F0AE, inset 0 0 15px rgba(76, 175, 80, 0.6); /* Liseré qui gonfle + halo */
     }
 }
 

@@ -814,18 +814,47 @@ input[type="number"]::-webkit-outer-spin-button {
     background-color: #0f395c;
 }
 
+/* ============================================================
+   SURBRILLANCE DU RELAIS EN COURS (MODE HAUTE VISIBILITÉ)
+   ============================================================ */
 .active-live-stint td {
-    animation: pulse-green-heavy 1.5s infinite !important;
+    background-color: rgba(165, 214, 167, 0.05) !important;
+    animation: pulse-bg-heavy 1.5s infinite !important;
+    font-weight: bold !important;
 }
 
-.active-live-stint td:first-child {
-    animation: pulse-bar-heavy 1.5s infinite !important;
-}
+    .active-live-stint td:first-child {
+        /* La première cellule joue les deux animations en même temps */
+        animation: pulse-bg-heavy 1.5s infinite, pulse-bar-heavy 1.5s infinite !important;
+    }
 
 .active-live-stint {
-    animation: pulse-green-heavy 1.5s infinite !important;
     z-index: 5;
     position: relative;
+}
+
+/* L'animation du fond (Gère 100% de la luminosité pour TOUTE la ligne) */
+@keyframes pulse-bg-heavy {
+    0%, 100% {
+        background-color: rgba(27, 94, 32, 0.5) !important;
+    }
+
+    50% {
+        background-color: rgba(76, 175, 80, 0.95) !important;
+    }
+    /* Flash quasi opaque */
+}
+
+/* L'animation du liseré (Gère 100% de la barre verticale pour la 1ère cellule) */
+@keyframes pulse-bar-heavy {
+    0%, 100% {
+        box-shadow: inset 6px 0 0 #4CAF50;
+    }
+
+    50% {
+        box-shadow: inset 12px 0 0 #69F0AE;
+    }
+    /* Fini le halo interne emprisonné ! */
 }
 
 .is-historical td {
@@ -1994,28 +2023,6 @@ svg.live-grey-icon {
 
     100% {
         box-shadow: inset 0 0 5px rgba(33,150,243,0.1);
-    }
-}
-
-/* Animation globale pour le clignotement du fond de la ligne */
-@keyframes pulse-bg-heavy {
-    0%, 100% {
-        background-color: rgba(27, 94, 32, 0.5) !important;
-    }
-
-    50% {
-        background-color: rgba(76, 175, 80, 0.85) !important;
-    }
-}
-
-/* Animation exclusive pour la barre verticale (Radar de gauche) */
-@keyframes pulse-bar-heavy {
-    0%, 100% {
-        box-shadow: inset 6px 0 0 #4CAF50;
-    }
-
-    50% {
-        box-shadow: inset 12px 0 0 #69F0AE, inset 0 0 15px rgba(76, 175, 80, 0.6);
     }
 }
 

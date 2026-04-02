@@ -23,23 +23,49 @@ let lastCalculatedState = null;
 let serverOffset = 0; // Le décalage de la carte mère en millisecondes
 
 async function calibrateTime() {
+    let start = Date.now();
+
     try {
-        let start = Date.now();
-        // 🚀 ASTUCE : "?_=" + start agit comme un "Cache-Buster" absolu pour forcer le mobile à actualiser !
-        let res = await fetch('https://worldtimeapi.org/api/timezone/Etc/UTC?_=' + start, {
+        // 🚀 PLAN A : API moderne + Cache-Buster absolu 
+        // (Attention : on utilise '&_=' car l'URL contient déjà un paramètre '?timeZone=UTC')
+        let res = await fetch('https://timeapi.io/api/Time/current/zone?timeZone=UTC&_=' + start, {
             method: 'GET',
             cache: 'no-store'
         });
         let data = await res.json();
 
-        if (data && data.datetime) {
-            let serverTime = new Date(data.datetime).getTime();
+        if (data && data.dateTime) {
+            // Ajout du "Z" pour forcer la lecture en UTC absolu
+            let serverTime = new Date(data.dateTime + "Z").getTime();
             let latency = (Date.now() - start) / 2;
             serverOffset = serverTime - (start + latency);
-            console.log("⏱️ Horloge atomique calibrée ! Décalage : " + serverOffset + "ms");
+            console.log("⏱️ Horloge atomique (Plan A) calibrée ! Décalage : " + serverOffset + "ms");
+            return; // Succès, on s'arrête là !
         }
-    } catch (e) {
-        console.warn("⚠️ Impossible de joindre l'horloge mondiale. Utilisation du temps local.");
+    } catch (e1) {
+        console.warn("⚠️ API externe bloquée (CORS/Adblock). Passage au Plan B...");
+    }
+
+    try {
+        // 🛡️ PLAN B : Serveur local + Cache-Buster absolu
+        // On s'assure d'abord de nettoyer l'URL actuelle s'il y a déjà des paramètres, puis on ajoute notre astuce
+        let cleanUrl = window.location.href.split('?')[0];
+        let res2 = await fetch(cleanUrl + '?_=' + start, {
+            method: 'HEAD',
+            cache: 'no-store'
+        });
+        let dateHeader = res2.headers.get('Date');
+
+        if (dateHeader) {
+            let serverTime = new Date(dateHeader).getTime();
+            let latency = (Date.now() - start) / 2;
+            serverOffset = serverTime - (start + latency);
+            console.log("⏱️ Horloge locale (Plan B) calibrée ! Décalage : " + serverOffset + "ms");
+        }
+    } catch (e2) {
+        // Si vraiment on n'a pas internet du tout
+        serverOffset = 0;
+        console.error("⚠️ Calibrage réseau impossible. Utilisation de l'horloge système brute.");
     }
 }
 

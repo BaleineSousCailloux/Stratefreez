@@ -2148,7 +2148,10 @@ function openRestartModal() {
     let input = document.getElementById('reset-confirm-input');
     let btn = document.getElementById('btn-confirm-reset');
     if (input) input.value = "";
-    if (btn) btn.disabled = true; // Verrouillage natif
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('btn-disabled'); // 🚀 On force le gris visuel à l'ouverture
+    }
 
     document.getElementById('restart-modal').classList.remove('hidden');
     if (input) setTimeout(() => input.focus(), 100);
@@ -2162,7 +2165,13 @@ function checkResetInput() {
     let input = document.getElementById('reset-confirm-input');
     let btn = document.getElementById('btn-confirm-reset');
     if (input && btn) {
-        btn.disabled = (input.value.trim().toUpperCase() !== "RESET");
+        if (input.value.trim().toUpperCase() === "RESET") {
+            btn.disabled = false;
+            btn.classList.remove('btn-disabled'); // 🚀 On retire le gris si le mot est bon
+        } else {
+            btn.disabled = true;
+            btn.classList.add('btn-disabled'); // 🚀 On remet le gris sinon
+        }
     }
 }
 

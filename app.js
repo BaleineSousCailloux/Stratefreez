@@ -4833,59 +4833,39 @@ function purgeLocalState() {
 // ==========================================
 // --- SAUVEGARDE LOCALE (.JSON) ---
 // ==========================================
+// 🚀 LA CORRECTION (Remplacez toute la fonction executeLocalSave)
 function executeLocalSave() {
-    // 1. Vérification de la Légalité (Votre fonction existante !)
-    // Si la course contient des erreurs rouges, la fonction bloque et ouvre la modale.
-    if (!checkExportSecurity()) {
-        // On s'assure de remettre le texte par défaut pour les erreurs de règles
-        document.getElementById('export-error-msg').innerHTML = "Veuillez corriger les alertes en rouge dans le suivi de course avant d'exporter.";
-        return;
-    }
+    if (!checkExportSecurity()) return;
 
-    let errorMsg = "";
-
-    // 2. Le Videur strict (Vérifications de la Propreté de la course)
-    if (!currentRaceId) {
-        errorMsg = "Aucune course n'est actuellement chargée dans l'application.";
-    } else if (liveTimerActive) {
-        errorMsg = "Le chronomètre est en cours de fonctionnement.<br><br>Vous devez d'abord l'arrêter et utiliser le bouton <strong>RACE RESET</strong> pour remettre la course à l'état Prête.";
-    } else {
-        // Vérifie s'il y a déjà des arrêts aux stands validés dans le tableau
-        let hasPits = strategySplits.some(split => split.stints.some(stint => stint.isPitted));
-        if (hasPits) {
-            errorMsg = "La course est terminée ou contient des arrêts aux stands validés.<br><br>Utilisez le bouton <strong>RACE RESET</strong> pour remettre la course à l'état Prête.";
+    let raceName = document.getElementById('local-save-name').value.trim();
+    if (!raceName) {
+        // Remplaçant de l'ancien alert() si vous utilisez la modale
+        if (typeof showErrorModal === 'function') {
+            showErrorModal("Export impossible : la course n'a pas de nom.");
+        } else {
+            alert("Export impossible : la course n'a pas de nom.");
         }
-    }
-
-    // 3. Affichage de la modale si la course n'est pas "propre"
-    if (errorMsg) {
-        document.getElementById('export-error-msg').innerHTML = errorMsg;
-        document.getElementById('export-error-modal').classList.remove('hidden');
         return;
     }
 
-    // 4. Exportation (Si Légal ET Propre)
+    // Exportation
     saveFormState();
+
+    // 🚀 LE FIX : On récupère proprement l'état dans la mémoire locale
+    let stateStr = localStorage.getItem('stratefreez-form-state');
+
     let exportData = {
-        formState: formState,
+        formState: stateStr ? JSON.parse(stateStr) : {}, // Remplace l'appel à la variable globale inexistante
         strategyData: strategySplits
     };
 
-    let dataStr = JSON.stringify(exportData, null, 2);
-    let blob = new Blob([dataStr], { type: "application/json" });
-    let url = URL.createObjectURL(blob);
-    let a = document.createElement('a');
-
-    let raceNameInput = document.getElementById('race-name-input');
-    // 🚀 Ne remplace QUE les caractères interdits par le système d'exploitation, garde les espaces !
-    let safeName = (raceNameInput && raceNameInput.value) ? raceNameInput.value.replace(/[\\/:*?"<>|]/g, '_') : "stratefreez_course";
-
-    a.href = url;
-    a.download = `${safeName}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 4));
+    let downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", raceName + ".json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
 }
 function handleLocalFileSelect(event) {
     let file = event.target.files[0];

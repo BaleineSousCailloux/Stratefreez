@@ -645,6 +645,9 @@ function triggerCloudSync() {
 // (Il faut chercher db.collection('races').doc(currentRaceId).set(...) dans saveFormState et le remplacer par triggerCloudSync();)
 
 function toggleObserverMode(isLocked) {
+    // 🚀 PROTECTION ABSOLUE : Impossible d'être spectateur d'une course qui n'existe pas
+    if (!currentRaceId) isLocked = false;
+
     document.body.classList.toggle('observer-locked', isLocked);
     let badge = document.getElementById('save-status-badge');
     if (badge) {
@@ -1129,6 +1132,13 @@ function listenToCloudRace() {
                     updateLiveSpotter(0, null);
                 }
             }
+        } else {
+            // 🚀 NOUVEAU : DÉTECTEUR DE COURSE FANTÔME
+            // Si la course est supprimée de la base pendant qu'on la regarde (ou au démarrage)
+            showErrorModal("Cette course a été supprimée du serveur.<br><br>Vous allez être ramené à l'accueil.");
+            clearCurrentRaceData();
+            if (typeof purgeLocalState === 'function') purgeLocalState();
+            openTab('tab-params');
         }
     });
 }

@@ -210,9 +210,9 @@
                     <div class="mb-15 mt-15">
                         <label class="inline-checkbox-label"><input type="checkbox" id="pit-tires-only"> Changement de type de gomme uniquement sur fenêtre</label>
                     </div>
-                    <div class="d-flex align-center gap-10 flex-wrap">
+                    <div class="d-flex align-center gap-10 flex-wrap" id="req-pits-container">
                         <label id="lbl-req-pit-stops" class="mb-0">Arrêts aux stands obligatoires</label>
-                        <input type="number" id="global-req-pit-stops" min="0" max="2" value="0" class="w-50-center">
+                        <input type="number" id="global-req-pit-stops" min="0" max="5" value="0" class="w-50-center" onchange="togglePitWindowUI(); saveFormState();">
                     </div>
                 </fieldset>
 

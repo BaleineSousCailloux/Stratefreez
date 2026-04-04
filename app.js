@@ -1157,21 +1157,60 @@ function togglePitWindowUI() {
     const raceType = document.getElementById('race-type')?.value;
     const numDrivers = parseInt(document.getElementById('num-drivers')?.value) || 1;
 
-    if (settingsArea) settingsArea.classList.toggle('hidden', !isEnabled);
-
     const isSoloOrOnline = (numDrivers <= 1 || raceType === 'online');
 
     const cbTiresOnly = document.getElementById('pit-tires-only');
     if (cbTiresOnly) cbTiresOnly.closest('div').classList.toggle('hidden', isSoloOrOnline);
 
-    const inputReqPits = document.getElementById('global-req-pit-stops');
-    if (inputReqPits) inputReqPits.closest('.d-flex').classList.toggle('hidden', !isSoloOrOnline);
+    // 🚀 NOUVELLES LOIS DE L'INTERFACE
+    const reqPitsInput = document.getElementById('global-req-pit-stops');
+    const reqPitsContainer = document.getElementById('req-pits-container');
+    const pitWindowCheckbox = document.getElementById('enable-pit-window');
 
-    if (isEnabled) {
+    if (reqPitsContainer && reqPitsInput && pitWindowCheckbox) {
+        // Règle 1 : Masquage total des arrêts obligatoires en IRL Multi
+        reqPitsContainer.classList.toggle('hidden', !isSoloOrOnline);
+
+        if (isSoloOrOnline) {
+            let reqPitsVal = parseInt(reqPitsInput.value) || 0;
+
+            // Règle 2 : Fenêtre active -> Arrêts max = 1
+            if (isEnabled) {
+                reqPitsInput.max = "1";
+                if (reqPitsVal > 1) {
+                    reqPitsInput.value = 1;
+                    if (typeof showErrorModal === 'function') {
+                        showErrorModal("La fenêtre de stand limite les arrêts obligatoires à 1 maximum.");
+                    }
+                }
+            } else {
+                reqPitsInput.max = "5"; // Débridage
+            }
+
+            // Règle 3 : Arrêts >= 2 -> Fenêtre grisée/désactivée
+            reqPitsVal = parseInt(reqPitsInput.value) || 0; // Re-lecture
+            if (reqPitsVal >= 2) {
+                pitWindowCheckbox.disabled = true;
+                pitWindowCheckbox.checked = false;
+                pitWindowCheckbox.closest('label').style.opacity = "0.5";
+                if (settingsArea) settingsArea.classList.add('hidden');
+            } else {
+                pitWindowCheckbox.disabled = false;
+                pitWindowCheckbox.closest('label').style.opacity = "1";
+            }
+        }
+    }
+
+    if (settingsArea && pitWindowCheckbox && !pitWindowCheckbox.disabled) {
+        settingsArea.classList.toggle('hidden', !pitWindowCheckbox.checked);
+    }
+
+    if (pitWindowCheckbox && pitWindowCheckbox.checked && !pitWindowCheckbox.disabled) {
         document.getElementById('ui-solo-window')?.classList.toggle('hidden', !isSoloOrOnline);
         document.getElementById('ui-multi-window')?.classList.toggle('hidden', isSoloOrOnline);
         if (isSoloOrOnline) updateSoloInputs();
-    } else {
+    } else if (pitWindowCheckbox && !pitWindowCheckbox.disabled) {
+        // On ne vide les champs que si l'utilisateur a manuellement décoché
         document.querySelectorAll('#window-settings-area input[type="text"], #window-settings-area input[type="number"]').forEach(inp => {
             inp.value = '';
         });
@@ -2379,10 +2418,159 @@ function formatTime(seconds) {
     return `${h}:${m}:${s}`;
 }
 
+// ==========================================
+// --- LE CERVEAU : OPTIMISATION DES RELAIS ---
+// ==========================================
+function optimizeStrategyFilling() {
+    let tires = getAvailableTires();
+    if (tires.length === 0) return;
+
+    let goal = document.getElementById('race-goal')?.value;
+    let safetyRes = parseFloat(document.getElementById('fuel-reserve')?.value.replace(/[^\d.]/g, '')) || 0;
+    let raceType = document.getElementById('race-type')?.value;
+    let isOnline = (raceType === 'online');
+    let isSolo = (parseInt(document.getElementById('num-drivers')?.value) === 1);
+    let hasPitWindow = document.getElementById('enable-pit-window')?.checked;
+
+    // 🛠️ HELPER : Le Plafond Physique
+    const getCeiling = (driver, tire) => {
+        let tLife = getDriverTireLife(driver, tire);
+        let fRate = getDriverFuelRate(driver, 'push');
+        let fLife = Math.floor((100 - safetyRes) / fRate);
+        return Math.max(1, Math.min(tLife, fLife));
+    };
+
+    // 🎯 1. Calcul de la Cible (En Tours)
+    let targetLaps = 0;
+    if (goal === 'laps') {
+        targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
+    } else {
+        let totalSec = getRaceDurationSeconds();
+        let sampleDriver = strategySplits[0]?.driver || getAvailableDrivers()[0];
+        let sampleTire = strategySplits[0]?.stints[0]?.tire || tires[0];
+        let avgLapSec = getDriverLapSeconds(sampleDriver, sampleTire, 'push') || 120;
+        targetLaps = Math.ceil(totalSec / avgLapSec); // Estimation, la cascade ajustera les secondes
+    }
+
+    let countCurrentLaps = () => strategySplits.reduce((sum, split) => sum + split.stints.reduce((s, stint) => s + stint.laps, 0), 0);
+
+    // 🌊 2. LE REMPLISSAGE
+    if (hasPitWindow && (isSolo || isOnline)) {
+        // 🔒 Cas Spécial : Verrouillage Spatial sur Fenêtre
+        let isLapMode = document.getElementById('pit-window-mode-tours')?.checked;
+        let targetStint1Laps = 1;
+
+        if (isLapMode) {
+            let winC = parseInt(document.getElementById('lap-pit-window-close')?.value) || 0;
+            targetStint1Laps = winC > 0 ? winC : 1;
+        } else {
+            let winC_time = document.getElementById('time-pit-window-close')?.value || "";
+            let secC = timeStringToSeconds(winC_time);
+            let avgLap = getDriverLapSeconds(strategySplits[0].driver, strategySplits[0].stints[0].tire, 'push');
+            targetStint1Laps = secC > 0 ? Math.floor(secC / avgLap) : 1;
+        }
+
+        // On remplit le Relais 1 jusqu'à la fin de la fenêtre (ou son plafond)
+        let ceil1 = getCeiling(strategySplits[0].driver, strategySplits[0].stints[0].tire);
+        strategySplits[0].stints[0].laps = Math.max(1, Math.min(targetStint1Laps, ceil1));
+
+        // On verse le reste dans le Relais 2 (si présent)
+        if (strategySplits[0].stints.length > 1) {
+            let remLaps = targetLaps - strategySplits[0].stints[0].laps;
+            if (remLaps > 0) {
+                let ceil2 = getCeiling(strategySplits[0].driver, strategySplits[0].stints[1].tire);
+                strategySplits[0].stints[1].laps = Math.min(remLaps, ceil2);
+            }
+        }
+    } else {
+        // 🏺 Règle Générale : Vases Communicants (Des Rapides vers les Lents)
+        tires.forEach(tireType => {
+            let stintsOfThisTire = [];
+            strategySplits.forEach((split) => {
+                split.stints.forEach((stint) => {
+                    if (stint.tire === tireType && !stint.isPitted) stintsOfThisTire.push({ split, stint });
+                });
+            });
+
+            let addedThisRound = true;
+            while (addedThisRound && countCurrentLaps() < targetLaps) {
+                addedThisRound = false;
+                for (let item of stintsOfThisTire) {
+                    if (countCurrentLaps() >= targetLaps) break;
+                    let ceil = getCeiling(item.split.driver, item.stint.tire);
+                    if (item.stint.laps < ceil) {
+                        item.stint.laps++;
+                        addedThisRound = true;
+                    }
+                }
+            }
+        });
+    }
+
+    // 🔗 3. L'ÉTIREMENT (Survie : Ajout de relais si course trop longue)
+    let safetyStretches = 15;
+    while (countCurrentLaps() < targetLaps && safetyStretches-- > 0) {
+        let lastSplit = strategySplits[strategySplits.length - 1];
+
+        let newStint = {
+            tire: tires[0], // Nait en Tendre
+            fuelStrat: 'push',
+            laps: 1,
+            changeTires: true,
+            isPitted: false,
+            lockedTimeSec: null,
+            manualFuel: null
+        };
+        lastSplit.stints.push(newStint);
+
+        let currentTireIndex = 0;
+        while (countCurrentLaps() < targetLaps) {
+            let ceil = getCeiling(lastSplit.driver, newStint.tire);
+            if (newStint.laps < ceil) {
+                newStint.laps++;
+            } else {
+                currentTireIndex++;
+                if (currentTireIndex < tires.length) {
+                    newStint.tire = tires[currentTireIndex]; // Mue vers Medium, Dur...
+                } else {
+                    break; // Mur absolu atteint, on ajoute un autre relais
+                }
+            }
+        }
+    }
+
+    // ✂️ 4. L'ÉCRÊTAGE (Optimisation Chrono : Retrait des tours lents en trop)
+    let excessLaps = countCurrentLaps() - targetLaps;
+    if (excessLaps > 0) {
+        let reverseTires = [...tires].reverse(); // Des Lents vers les Rapides
+        reverseTires.forEach(tireType => {
+            let stintsOfThisTire = [];
+            strategySplits.forEach(split => {
+                split.stints.forEach(stint => {
+                    if (stint.tire === tireType && !stint.isPitted) stintsOfThisTire.push(stint);
+                });
+            });
+
+            let removedThisRound = true;
+            while (excessLaps > 0 && removedThisRound) {
+                removedThisRound = false;
+                for (let stint of stintsOfThisTire) {
+                    if (excessLaps <= 0) break;
+                    if (stint.laps > 1) { // On ne vide jamais totalement un vase
+                        stint.laps--;
+                        excessLaps--;
+                        removedThisRound = true;
+                    }
+                }
+            }
+        });
+    }
+}
+
 function initStrategyData() {
     let maxConsecutive = Math.max(1, parseInt(document.getElementById('max-consecutive-splits')?.value) || 1);
     const numSplits = parseInt(document.getElementById('total-splits')?.value) || 1;
-    if (strategySplits.length === numSplits) return;
+    if (strategySplits.length === numSplits) return; // Sécurité de non-destruction
 
     let drivers = getAvailableDrivers();
     let spotters = getAvailableSpotters();
@@ -2394,10 +2582,9 @@ function initStrategyData() {
 
     if (isOnline || isSolo) maxConsecutive = 1;
 
-    let hasPitWindow = document.getElementById('enable-pit-window')?.checked;
-    let isLapMode = document.getElementById('pit-window-mode-tours')?.checked;
-    let winO_lap = parseInt(document.getElementById('lap-pit-window-open')?.value) || 0;
-    let winO_time = timeStringToSeconds(document.getElementById('time-pit-window-open')?.value || "");
+    // 🏗️ ÉTAPE 1 : LE BÂTISSEUR (Squelette minimum légal)
+    let reqPits = (isSolo || isOnline) ? (parseInt(document.getElementById('global-req-pit-stops')?.value) || 0) : 0;
+    let initialStintsCount = Math.max(1, reqPits + 1);
 
     let newSplits = [];
     for (let i = 0; i < numSplits; i++) {
@@ -2406,63 +2593,16 @@ function initStrategyData() {
         } else {
             let drvIndex = Math.floor(i / maxConsecutive) % drivers.length;
             let drv = drivers[drvIndex];
-
-            // --- Sélection du Spotter groupée et filtrée ---
             let availableSpotters = spotters.filter(s => s !== drv);
             let sptIndex = Math.floor(i / maxConsecutive) % Math.max(1, availableSpotters.length);
             let spt = availableSpotters.length > 0 ? availableSpotters[sptIndex] : "";
 
-            let bestStartTire = tires[0] || "";
-            if (hasPitWindow && (isSolo || isOnline) && tires.length > 1) {
-                for (let t of tires) {
-                    let maxLapsTire = getDriverTireLife(drv, t);
-                    if (isLapMode) {
-                        if (winO_lap === 0 || maxLapsTire >= winO_lap) { bestStartTire = t; break; }
-                    } else {
-                        let avgLapSec = getDriverLapSeconds(drv, t, 'eco');
-                        if (winO_time === 0 || (maxLapsTire * avgLapSec) >= winO_time) { bestStartTire = t; break; }
-                    }
-                }
-            }
-
-            // 🚀 CORRECTION A : Génération intelligente des arrêts en Solo/Online
-            let reqPits = (isSolo || isOnline) ? (parseInt(document.getElementById('global-req-pit-stops')?.value) || 0) : 0;
-            let initialStintsCount = Math.max(1, reqPits + 1);
             let generatedStints = [];
-
-            let avgLapSec = getDriverLapSeconds(drv, bestStartTire, 'push') || 120;
-
             for (let k = 0; k < initialStintsCount; k++) {
-                let defaultLaps = 1;
-
-                if (hasPitWindow && reqPits > 0 && (isSolo || isOnline)) {
-                    let secO = timeStringToSeconds(document.getElementById('time-pit-window-open')?.value || "");
-                    let secC = timeStringToSeconds(document.getElementById('time-pit-window-close')?.value || "");
-                    let lapO = parseInt(document.getElementById('lap-pit-window-open')?.value) || 0;
-                    let lapC = parseInt(document.getElementById('lap-pit-window-close')?.value) || 0;
-
-                    if (k < reqPits) {
-                        // 🚀 REPARTITION CENTRÉE : On divise la fenêtre en (reqPits + 1) pour créer des marges de sécurité
-                        if (isLapMode && lapO > 0 && lapC > 0) {
-                            let step = (lapC - lapO) / (reqPits + 1);
-                            let targetTotalLaps = Math.round(lapO + ((k + 1) * step));
-                            let lapsAlreadyAssigned = generatedStints.reduce((sum, s) => sum + s.laps, 0);
-                            defaultLaps = Math.max(1, targetTotalLaps - lapsAlreadyAssigned);
-                        } else if (!isLapMode && secO > 0 && secC > 0) {
-                            let step = (secC - secO) / (reqPits + 1);
-                            let targetTotalSec = secO + ((k + 1) * step);
-                            // Math.round au lieu de Math.floor pour viser le tour le plus proche du centre
-                            let targetTotalLaps = Math.round(targetTotalSec / avgLapSec);
-                            let lapsAlreadyAssigned = generatedStints.reduce((sum, s) => sum + s.laps, 0);
-                            defaultLaps = Math.max(1, targetTotalLaps - lapsAlreadyAssigned);
-                        }
-                    }
-                }
-
                 generatedStints.push({
-                    tire: bestStartTire,
+                    tire: tires[0], // Nait avec la gomme la plus rapide
                     fuelStrat: "push",
-                    laps: defaultLaps,
+                    laps: 1, // Minimum syndical (Le Cerveau remplira plus tard)
                     changeTires: true,
                     isPitted: false,
                     lockedTimeSec: null,
@@ -2478,20 +2618,22 @@ function initStrategyData() {
         }
     }
     strategySplits = newSplits;
-
     isHardCascade = true;
-    cascadeFixPitWindows();
+
+    // ⚖️ ÉTAPE 2 : LE JURISTE (Gommes obligatoires & Robin des Bois)
     applyRegulatoryTires();
 
+    // 🧠 ÉTAPE 3 : LE CERVEAU (Remplissage optimisé)
+    optimizeStrategyFilling();
+
+    // 🛡️ SÉCURITÉ : Anti-fusion des arrêts obligatoires
     strategySplits.forEach(split => {
-        let reqPits = (isSolo || isOnline) ? (parseInt(document.getElementById('global-req-pit-stops')?.value) || 0) : 0;
-        let minStints = reqPits + 1;
+        let rPits = (isSolo || isOnline) ? (parseInt(document.getElementById('global-req-pit-stops')?.value) || 0) : 0;
+        let minStints = rPits + 1;
 
         for (let j = split.stints.length - 2; j >= 0; j--) {
             let current = split.stints[j];
             let next = split.stints[j + 1];
-
-            // 🚀 CORRECTION B : On interdit la fusion si cela supprime un arrêt obligatoire
             let preventMerge = (isSolo || isOnline) && (split.stints.length <= minStints);
 
             if (!preventMerge && !current.isPitted && !next.isPitted && current.tire === next.tire && current.fuelStrat === next.fuelStrat) {
@@ -2501,12 +2643,12 @@ function initStrategyData() {
         }
     });
 
+    // ⚙️ ÉTAPE 4 : LE PHYSICIEN (Validation chronométrique & fenêtres)
     cascadeFixPitWindows();
-    isHardCascade = false;
 
+    isHardCascade = false;
     saveFormState();
 }
-
 function updateSplitData(splitIdx, field, val) {
     strategySplits[splitIdx][field] = val;
     if (field === 'driver') {

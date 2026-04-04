@@ -1,0 +1,15 @@
+{
+    "name": "Stratefreez",
+    "short_name": "Stratefreez",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#1e1e1e",
+    "theme_color": "#cc2d53",
+    "icons": [
+        {
+            "src": "Stratefreez.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

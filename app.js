@@ -3957,7 +3957,10 @@ function renderStrategy() {
             let manualFuelClass = stint.manualFuel !== null ? 'manual-override-text' : '';
             let fuelCellHTML = isAbsoluteFirst ? `<span class="px-5 py-2">${initialFuel.toFixed(1)}<span class="unite"> L</span></span>` : (isHistorical ? `<span class="inline-block px-5 py-2">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>` : `<span class="inline-block cursor-pointer px-5 py-2 border-radius-4 ${manualFuelClass}" onclick="openFuelModal(${i}, ${j}, ${stint.cachedTargetFuel})">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>`);
 
-            let lapsInputHTML = (isLockedStint || isHistorical) ? `<div class="locked-input-container"><input type="number" class="table-input" value="${stint.laps}" disabled><span class="material-symbols-outlined lock-icon-inside" title="Verrouillé">lock</span></div>` : `<input type="number" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
+            // 🚀 ERGONOMIE MOBILE : Appelle le pavé numérique et supprime l'ancien cadenas
+            let lapsInputHTML = (isLockedStint || isHistorical) ?
+                `<input type="number" inputmode="numeric" pattern="[0-9]*" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` :
+                `<input type="number" inputmode="numeric" pattern="[0-9]*" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
 
             // 🚀 CALCUL DU TOUT DERNIER STINT POUR LE DRAPEAU
             let isUltimateStint = false;

@@ -858,37 +858,13 @@ input[type="number"]:disabled {
     width: 100% !important;
 }
 
-.locked-input-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 100%;
-    margin: 0 auto;
-}
-
-    .locked-input-container::after {
-        content: "";
-        position: absolute;
-        right: 2px;
-        top: 2px;
-        bottom: 2px;
-        width: 25px;
-        background-color: #222;
-        z-index: 1;
-        pointer-events: none;
-    }
-
-.lock-icon-inside {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 20px;
-    color: #cc2d53 !important;
-    pointer-events: none;
-    z-index: 2;
+/* 🚀 NOUVEAU STYLE : Case de tours verrouillée (Remplace l'ancien cadenas) */
+input.table-input:disabled {
+    background-color: #222 !important;
+    border: 2px solid #cc2d53 !important; /* Bordure rouge vif */
+    color: #ff5252 !important; /*Chiffre rouge pour l'alerte */
+    opacity: 1 !important; /* Pleine lisibilité garantie */
+    font-weight: bold;
 }
 
 /* Fuel Cell (Tableau) */
@@ -997,6 +973,14 @@ input[type="number"]:disabled {
     }
 
 /* Inputs & Boutons Tableau */
+/* 🚀 NOUVEAU : On supprime la flèche des sélecteurs partout (PC et Mobile) pour un centrage parfait */
+.table-select, .header-driver, .header-spotter {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    text-align-last: center;
+}
+
 .table-select {
     width: 100%;
     height: 34px;

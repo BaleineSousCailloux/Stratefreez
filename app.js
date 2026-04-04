@@ -318,10 +318,18 @@ function openTab(tabId) {
 // --- REINITIALISATIONS ET IMPORT/EXPORT ---
 // ==========================================
 
-function openResetTab1Modal() { document.getElementById('reset-tab1-modal').classList.remove('hidden'); }
+function openResetTab1Modal() {
+    let timerStr = localStorage.getItem('stratefreez-timer');
+    if (timerStr && JSON.parse(timerStr).active) {
+        return showErrorModal("Impossible de réinitialiser les paramètres pendant qu'une course est en cours.");
+    }
+    document.getElementById('reset-tab1-modal').classList.remove('hidden');
+}
 function closeResetTab1Modal() { document.getElementById('reset-tab1-modal').classList.add('hidden'); }
 function confirmResetTab1() {
+    let currentName = document.getElementById('race-name-input').value; // 🚀 Sauvegarde
     document.getElementById('form-params').reset();
+    document.getElementById('race-name-input').value = currentName; // 🚀 Restauration
     document.getElementById('num-drivers').value = 1;
     document.getElementById('num-spotters').value = 1;
     document.getElementById('total-splits').value = 1;
@@ -333,7 +341,13 @@ function confirmResetTab1() {
     closeResetTab1Modal();
 }
 
-function openResetTab2Modal() { document.getElementById('reset-tab2-modal').classList.remove('hidden'); }
+function openResetTab2Modal() {
+    let timerStr = localStorage.getItem('stratefreez-timer');
+    if (timerStr && JSON.parse(timerStr).active) {
+        return showErrorModal("Impossible de réinitialiser la technique pendant qu'une course est en cours.");
+    }
+    document.getElementById('reset-tab2-modal').classList.remove('hidden');
+}
 function closeResetTab2Modal() { document.getElementById('reset-tab2-modal').classList.add('hidden'); }
 function confirmResetTab2() {
     document.getElementById('form-tech').reset();
@@ -821,6 +835,14 @@ function clearCurrentRaceData() {
     document.getElementById('form-tech').reset();
     strategySplits = [];
 
+    // 🚀 FERMETURE DES MENUS FANTÔMES (Onglets 1 & 2)
+    toggleSpotters();
+    togglePitWindowUI();
+    let pt = document.getElementById('personalize-drivers-toggle');
+    if (pt) pt.checked = false;
+    toggleDriverPersonalization();
+    ['T', 'M', 'D', 'I', 'P'].forEach(t => toggleTireOptions(t));
+
     document.getElementById('num-drivers').value = 1;
     document.getElementById('num-spotters').value = 1;
     document.getElementById('total-splits').value = 1;
@@ -1051,9 +1073,12 @@ async function confirmSwitchRace() {
             localStorage.setItem('stratefreez-is-race-active', isRaceActive);
 
             // On applique les données du Cloud à l'application
-            if (data.strategyData) {
+            if (data.strategyData && data.strategyData.length > 0) {
                 strategySplits = data.strategyData;
                 localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
+            } else {
+                strategySplits = []; // 🚀 S'assure de vider la mémoire
+                initStrategyData();  // 🚀 Reconstruit le squelette vierge pour l'onglet 3
             }
             if (data.formState) applyFormStateToDOM(data.formState);
 
@@ -1655,11 +1680,26 @@ function bindGlobalSyncEvents() {
 
 function startLiveTimer(splitIdx) {
     if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
+
+    // 🛡️ PRE-FLIGHT CHECK (Vérification vitale avant départ)
+    let tires = getAvailableTires();
     let goal = document.getElementById('race-goal')?.value;
+    let totalSecRace = getRaceDurationSeconds();
+    let hasLaps = document.getElementById('race-laps')?.value;
+
+    if (tires.length === 0) {
+        return showErrorModal("DÉPART IMPOSSIBLE : Vous devez déclarer au moins 1 type de gomme dans l'onglet Technique.");
+    }
+    if (goal === 'time' && totalSecRace <= 0) {
+        return showErrorModal("DÉPART IMPOSSIBLE : La durée de la course n'est pas définie ou est à zéro.");
+    }
+    if (goal === 'laps' && (!hasLaps || parseInt(hasLaps) <= 0)) {
+        return showErrorModal("DÉPART IMPOSSIBLE : Le nombre de tours de la course n'est pas défini.");
+    }
+
     let raceType = document.getElementById('race-type')?.value || 'irl';
     let isOnline = (raceType === 'online');
 
-    let totalSecRace = getRaceDurationSeconds();
     let splitsCount = parseInt(document.getElementById('total-splits').value) || 1;
     let splitDurSec = totalSecRace / splitsCount;
 

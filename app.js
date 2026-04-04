@@ -189,26 +189,23 @@ function saveFormState() {
     triggerCloudSync();
 }
 
-let globalSaveTimeout = null;
+// 🚀 FINI LE MINUTEUR, on supprime globalSaveTimeout
 
 document.addEventListener('input', (e) => {
+    // 1. On garde uniquement les calculs visuels en direct.
+    // 🚀 AUCUNE sauvegarde Cloud ne part pendant qu'on tape !
     if (['stop-timer-input', 'save-config-name', 'import-config-file', 'quick-save-name'].includes(e.target.id)) return;
 
-    // 🚀 CORRECTION : Ajout de 'race-duration' pour que le calcul se lance à chaque frappe !
     if (['race-duration', 'race-duration-hh', 'race-duration-mm', 'race-laps', 'total-splits'].includes(e.target.id)) {
         calculateSplit();
     }
-
-    clearTimeout(globalSaveTimeout);
-    globalSaveTimeout = setTimeout(() => {
-        saveFormState();
-    }, 500);
 });
 
 document.addEventListener('change', (e) => {
+    // 2. 🚀 DÉCLENCHEUR ATOMIQUE : Se déclenche quand on "valide" (Entrée, Clic ailleurs, ou choix d'un menu)
     if (['stop-timer-input', 'save-config-name', 'import-config-file', 'quick-save-name'].includes(e.target.id)) return;
 
-    clearTimeout(globalSaveTimeout);
+    // On enregistre ET ça tire immédiatement sur le Cloud grâce à la Voie Rapide
     saveFormState();
 
     if (e.target.id === 'enable-pit-window' || e.target.id === 'pit-window-mode-tours') {
@@ -254,6 +251,11 @@ function updateAlertVisibility() {
 }
 
 function openTab(tabId) {
+    // 🚀 LE NETTOYEUR : On détruit le focus fantôme instantanément au changement d'onglet
+    // (Baisse le bouclier et force la validation de n'importe quelle case en cours d'édition)
+    if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+    }
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(tabId).classList.remove('hidden');
@@ -282,24 +284,27 @@ function openTab(tabId) {
         }
 
         setTimeout(() => {
-            let targetEl = null;
-            let timerStr = localStorage.getItem('stratefreez-timer');
-            let timerState = timerStr ? JSON.parse(timerStr) : null;
+            if (tabId === 'tab-strategy') {
+                // 🚀 CIBLAGE INTELLIGENT (Uniquement Onglet 3)
+                let targetEl = null;
+                let timerStr = localStorage.getItem('stratefreez-timer');
+                let timerState = timerStr ? JSON.parse(timerStr) : null;
 
-            if (timerState && timerState.active) {
-                targetEl = document.querySelector('.active-live-stint');
-            }
-            if (!targetEl) {
-                targetEl = document.querySelector('.active-stint');
-            }
-            if (!targetEl) {
-                targetEl = document.querySelector('tr[data-stint]:not(.is-historical)');
-            }
+                if (timerState && timerState.active) {
+                    targetEl = document.querySelector('.active-live-stint'); // Focus Chrono (Vert)
+                }
+                if (!targetEl) {
+                    targetEl = document.querySelector('.active-stint'); // Focus Reprise (Bleu)
+                }
 
-            if (targetEl) {
-                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
             } else {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                // 🚀 COMPORTEMENT VIERGE : Tous les autres onglets remontent brutalement à 0,0
+                window.scrollTo({ top: 0, behavior: 'auto' });
             }
         }, 150);
     }
@@ -612,33 +617,25 @@ let unsubscribeCloud = null;
 
 // 🚀 NOUVELLES VARIABLES SÉCURITÉ & RÉSEAU
 let isEngineerMode = false; // Sera défini dynamiquement selon la course
-let cloudSyncTimeout = null; // L'amortisseur de requêtes Firebase
 
-// ==========================================
-// --- AXE 2 & 5 : SÉCURITÉ ET AMORTISSEUR CLOUD ---
-// ==========================================
 function triggerCloudSync() {
     // 🛡️ PROTECTIONS : Pas de course ? Pas ingénieur ? Hors-ligne ? On bloque l'envoi !
     if (!currentRaceId || !isRaceActive || !isEngineerMode || !navigator.onLine) return;
 
-    // 🛡️ AMORTISSEUR : On annule l'envoi précédent s'il y a une nouvelle frappe
-    if (cloudSyncTimeout) clearTimeout(cloudSyncTimeout);
+    // 🚀 LA VOIE RAPIDE : Envoi atomique et immédiat à la milliseconde près !
+    // (Fini le setTimeout de 800ms)
+    let stateStr = localStorage.getItem('stratefreez-form-state');
+    let stratStr = localStorage.getItem('stratefreez-data');
+    let timerStr = localStorage.getItem('stratefreez-timer');
+    let timerState = timerStr ? JSON.parse(timerStr) : null;
 
-    // On regroupe tout et on envoie au bout de 800ms de silence (protège les quotas Firebase)
-    cloudSyncTimeout = setTimeout(() => {
-        let stateStr = localStorage.getItem('stratefreez-form-state');
-        let stratStr = localStorage.getItem('stratefreez-data');
-        let timerStr = localStorage.getItem('stratefreez-timer');
-        let timerState = timerStr ? JSON.parse(timerStr) : null;
-
-        db.collection('races').doc(currentRaceId).update({
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            formState: stateStr ? JSON.parse(stateStr) : {},
-            strategyData: stratStr ? JSON.parse(stratStr) : [],
-            timerState: timerState,
-            isTimerRunning: timerState ? timerState.active : false
-        }).catch(err => console.error("Erreur de synchro Cloud :", err));
-    }, 800);
+    db.collection('races').doc(currentRaceId).update({
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        formState: stateStr ? JSON.parse(stateStr) : {},
+        strategyData: stratStr ? JSON.parse(stratStr) : [],
+        timerState: timerState,
+        isTimerRunning: timerState ? timerState.active : false
+    }).catch(err => console.error("Erreur de synchro Cloud :", err));
 }
 
 // Nettoie l'envoi Cloud de l'ancienne fonction saveFormState
@@ -1097,6 +1094,13 @@ function listenToCloudRace() {
                 strategySplits = data.strategyData;
                 localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
                 renderStrategy();
+
+                // 🚀 L'ÉTINCELLE VISUELLE : Ordre direct au Live Spotter
+                // Si une modif de strat/essence ou un Pit arrive, on force le Live à se redessiner
+                // à la milliseconde, sans attendre le prochain tour d'horloge local !
+                if (liveTimerActive) {
+                    timerTick();
+                }
             }
 
             // 3. MISE À JOUR FORMULAIRES (Seulement si on ne tape pas)
@@ -4931,7 +4935,9 @@ function handleLocalFileSelect(event) {
                         localStorage.setItem('stratefreez-is-race-active', 'true');
                         localStorage.setItem(`stratefreez-passport-${currentRaceId}`, 'true');
 
-                        formState = importedData.formState;
+                        // 🚀 SAUVEGARDE LOCALE PROPRE (Au lieu de forcer une variable fantôme)
+                        localStorage.setItem('stratefreez-form-state', JSON.stringify(importedData.formState));
+                        localStorage.setItem('stratefreez-data', JSON.stringify(importedData.strategyData));
                         strategySplits = importedData.strategyData;
 
                         let navBrandText = document.getElementById('nav-brand-text');

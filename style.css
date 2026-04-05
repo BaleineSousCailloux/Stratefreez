@@ -1313,8 +1313,8 @@ select:disabled, input:disabled, .locked-sim {
 }
 
 #live-standby-overlay {
-    position: absolute;
-    top: 0;
+    position: fixed; /* 🚀 Change de absolute à fixed pour ignorer le padding du parent */
+    top: 78px; /* Aligne sous la navbar standard */
     left: 0;
     right: 0;
     bottom: 0;
@@ -1323,13 +1323,12 @@ select:disabled, input:disabled, .locked-sim {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
-    min-width: 100vw;
 }
 
 #btn-giant-start {
-    width: 60vw;
-    height: 60vh;
+    width: 70%;
+    height: auto;
+    min-height: 30% !important;
     font-size: 2em;
     padding: 20px 40px;
     border-radius: 8px;
@@ -2047,6 +2046,12 @@ svg.live-grey-icon {
 /* Style commun aux deux alertes d'orientation */
 .portrait-overlay, .landscape-overlay {
     display: none;
+    z-index: 60;
+    position: fixed; /* 🚀 Indispensable pour supprimer le scroll */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background-color: #1e1e1e;
     color: #82b1ff;
     font-weight: bold;
@@ -2055,10 +2060,9 @@ svg.live-grey-icon {
     align-items: center;
     justify-content: center;
     padding: 20px;
-    height: calc(100vh - 100px);
-    width: 100vw;
     border: none !important;
     margin: 0;
+    box-sizing: border-box;
     animation: pulse-text 2s infinite;
 }
 
@@ -2336,6 +2340,14 @@ svg.live-grey-icon {
     /* Onglet 4 */
     .live-dashboard-grid:not(.hidden) {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    #live-standby-overlay {
+        top: 45px;
+    }
+
+    #btn-giant-start {
+        padding: 15px 30px;
     }
 }
 

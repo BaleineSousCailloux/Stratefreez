@@ -3569,79 +3569,282 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
 function checkGlobalRules() {
     let rulesErrors = [];
-    let tireRule = document.getElementById('req-tire')?.value;
-    let reqTireCount = parseInt(document.getElementById('req-tire-count')?.value) || 1;
-    let reqTireWindow = document.getElementById('pit-tires-only')?.checked;
+    let splitCount = {};
+    let tireTrains = { T: 0, M: 0, D: 0, I: 0, P: 0 };
+    let tireFullSplits = { T: 0, M: 0, D: 0, I: 0, P: 0 };
+    let currentTrainTire = null;
+
+    let reqTireChange = document.getElementById('global-req-tire-change')?.checked;
+    let reqTireOnWindow = document.getElementById('pit-tires-only')?.checked;
+    let reqPits = parseInt(document.getElementById('global-req-pit-stops')?.value) || 0;
+
+    let raceType = document.getElementById('race-type')?.value;
+    let isOnline = raceType === 'online';
+    let isSolo = parseInt(document.getElementById('num-drivers').value) === 1;
+
     let hasPitWindow = document.getElementById('enable-pit-window')?.checked;
     let isLapMode = document.getElementById('pit-window-mode-tours')?.checked;
+
+    let winOpen = parseInt(document.getElementById('pit-window-open')?.value) || 0;
+    let winClose = parseInt(document.getElementById('pit-window-close')?.value) || 0;
+    let winO_time = timeStringToSeconds(document.getElementById('time-pit-window-open')?.value || ""); // 🚀 MS
+    let winC_time = timeStringToSeconds(document.getElementById('time-pit-window-close')?.value || ""); // 🚀 MS
     let winO_lap = parseInt(document.getElementById('lap-pit-window-open')?.value) || 0;
     let winC_lap = parseInt(document.getElementById('lap-pit-window-close')?.value) || 0;
 
-    // 🚀 Lues en Millisecondes grâce à la nouvelle fonction
-    let winO_time = timeStringToSeconds(document.getElementById('time-pit-window-open')?.value || "");
-    let winC_time = timeStringToSeconds(document.getElementById('time-pit-window-close')?.value || "");
+    let splitsCount = parseInt(document.getElementById('total-splits').value) || 1;
+    let totalSecRace = getRaceDurationSeconds(); // 🚀 MS
+    let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0; // 🚀 MS
 
-    let raceType = document.getElementById('race-type')?.value;
-    let isOnline = (raceType === 'online');
-    let isSolo = (parseInt(document.getElementById('num-drivers')?.value) === 1);
-    let splitsCount = parseInt(document.getElementById('total-splits')?.value) || 1;
-    let splitDurSec = splitsCount > 0 ? getRaceDurationSeconds() / splitsCount : 0; // MS
+    let bilanHTML = "<ul class='list-unstyled'>";
+    let tireFails = { T: [], M: [], D: [], I: [], P: [] };
 
-    let winOpen = parseInt(document.getElementById('pit-window-open')?.value) || 0; // minutes
-    let winClose = parseInt(document.getElementById('pit-window-close')?.value) || 0; // minutes
+    let lastTireUsed = null;
 
-    let tireUsage = {};
+    function isPitInWindow(pitSec, pitLap, relayStartSec, relayStartLap) {
+        if (!hasPitWindow) return true;
+        if (isSolo || isOnline) {
+            let relativeLap = pitLap - relayStartLap;
+            let relativeSec = pitSec - relayStartSec;
+            if (isLapMode) {
+                if (winO_lap === 0 && winC_lap === 0) return true;
+                return (relativeLap >= winO_lap && relativeLap <= winC_lap);
+            } else {
+                if (winO_time === 0 && winC_time === 0) return true;
+                return (relativeSec >= winO_time && relativeSec <= winC_time);
+            }
+        } else {
+            // 🚀 CORRECTION : winOpenSec est en MS, donc minutes * 60000
+            let winOpenSec = winOpen * 60000;
+            let winCloseSec = winClose * 60000;
+            for (let k = 0; k < splitsCount; k++) {
+                let targetSec = (k + 1) * splitDurSec;
+                if (pitSec >= targetSec - winOpenSec && pitSec <= targetSec + winCloseSec) return true;
+            }
+            return false;
+        }
+    }
 
     for (let i = 0; i < strategySplits.length; i++) {
         let split = strategySplits[i];
-        let isLastSplit = (i === strategySplits.length - 1);
+        splitCount[split.driver] = (splitCount[split.driver] || 0) + 1;
+        let splitTires = new Set();
+        let pitsInSplit = split.stints.length - 1;
+
+        if (isOnline && !isSolo) {
+            if (reqPits > 0) {
+                let ok = pitsInSplit >= reqPits;
+                let colClass = ok ? 'text-success' : 'text-danger';
+                bilanHTML += `<li>Relais ${i + 1} - Arrêts : <span class="${colClass}">${pitsInSplit} / ${reqPits}</span></li>`;
+                if (!ok) rulesErrors.push(`Relais ${i + 1}: ${reqPits} arrêt(s) requis.`);
+            }
+        }
+
         for (let j = 0; j < split.stints.length; j++) {
             let stint = split.stints[j];
-            if (tireRule && tireRule !== 'none' && stint.tire === tireRule) {
-                tireUsage[split.driver] = (tireUsage[split.driver] || 0) + 1;
+            let isAbsFirst = (i === 0 && j === 0) || ((isOnline || isSolo) && j === 0);
+
+            let actualTire = stint.tire;
+            if (!stint.changeTires && !isAbsFirst && currentTrainTire) actualTire = currentTrainTire;
+
+            if (!isOnline || isSolo) splitTires.add(actualTire);
+
+            if (stint.changeTires || isAbsFirst) {
+                if (actualTire) tireTrains[actualTire]++;
+                currentTrainTire = actualTire;
             }
 
-            if (hasPitWindow && (!isLastSplit || isSolo || isOnline)) {
+            let isPit = !isAbsFirst;
+            if (isPit && hasPitWindow) {
+                let prevStint = (j > 0) ? split.stints[j - 1] : strategySplits[i - 1].stints[strategySplits[i - 1].stints.length - 1];
+                let relayStartSec = split.stints[0].startSec;
+                let relayStartLap = split.stints[0].startLap;
+
+                let pitInWindow = isPitInWindow(prevStint.endSec, prevStint.endLap, relayStartSec, relayStartLap);
+                let termLabel = (raceType === 'online') ? 'Relais' : 'Split';
+
                 if (isSolo || isOnline) {
-                    if (j > 0) {
-                        if (isLapMode) {
-                            let pitLap = split.stints[j - 1].endLap - split.stints[0].startLap;
-                            if (winO_lap > 0 && winC_lap > 0 && (pitLap < winO_lap || pitLap > winC_lap)) {
-                                if (!rulesErrors.includes("Arrêts hors fenêtre détectés.")) rulesErrors.push("Arrêts hors fenêtre détectés.");
-                            }
-                        } else {
-                            let pitTimeSec = split.stints[j - 1].endSec - split.stints[0].startSec; // Déjà en MS
-                            if (winO_time > 0 && winC_time > 0 && (pitTimeSec < winO_time || pitTimeSec > winC_time)) {
-                                if (!rulesErrors.includes("Arrêts hors fenêtre détectés.")) rulesErrors.push("Arrêts hors fenêtre détectés.");
-                            }
+                    if (!pitInWindow) {
+                        let msg = `Arrêt aux stands hors fenêtre`;
+                        rulesErrors.push(`${termLabel} ${i + 1} : ${msg}`);
+                        bilanHTML += `<li>${termLabel} ${i + 1} : <span class="text-danger">${msg}</span></li>`;
+                    }
+                } else {
+                    if (!pitInWindow) {
+                        let isInterSplit = (j === 0 && i > 0);
+                        let isDriverChange = isInterSplit && (strategySplits[i - 1].driver !== split.driver);
+                        let isTireChange = (reqTireOnWindow && lastTireUsed && actualTire !== lastTireUsed);
+
+                        let culpritSplit = isInterSplit ? i : i + 1;
+
+                        if (isDriverChange) {
+                            let msg = `Changement de pilote hors fenêtre`;
+                            rulesErrors.unshift(`${termLabel} ${culpritSplit} : ${msg}`);
+                            bilanHTML += `<li>${termLabel} ${culpritSplit} : <span class="text-danger font-weight-bold">${msg}</span></li>`;
+                        } else if (isTireChange) {
+                            let msg = `Gomme changée hors fenêtre (${lastTireUsed} ➔ ${actualTire})`;
+                            rulesErrors.push(`${termLabel} ${culpritSplit} : ${msg}`);
+                            bilanHTML += `<li>${termLabel} ${culpritSplit} : <span class="text-danger">${msg}</span></li>`;
                         }
+                    }
+                }
+            }
+            lastTireUsed = actualTire;
+        }
+
+        let startedLate = false;
+        let endedEarly = false;
+
+        if (hasPitWindow && (!isSolo && !isOnline)) {
+            let pitEntryAtStart = split.stints[0].startSec;
+            if (i > 0) {
+                let prevSplit = strategySplits[i - 1];
+                pitEntryAtStart = prevSplit.stints[prevSplit.stints.length - 1].endSec;
+            }
+
+            let endSec = split.stints[split.stints.length - 1].endSec;
+
+            if (splitDurSec > 0) {
+                // 🚀 CORRECTION : winOpenSec est en MS, donc minutes * 60000
+                let winOpenSec = winOpen * 60000;
+                let winCloseSec = winClose * 60000;
+
+                if (i > 0) {
+                    let startTheo = i * splitDurSec;
+                    if (pitEntryAtStart > startTheo + winCloseSec) {
+                        startedLate = true;
+                    }
+                }
+
+                if (i < strategySplits.length - 1) {
+                    let endTheo = (i + 1) * splitDurSec;
+                    if (endSec < endTheo - winOpenSec) {
+                        endedEarly = true;
                     }
                 }
             }
         }
 
-        if (hasPitWindow && splitDurSec > 0 && !isOnline && !isSolo && !isLastSplit) {
-            let finalSec = split.stints[split.stints.length - 1].endSec; // Déjà en MS
+        if (splitTires.size === 1) {
+            let t = Array.from(splitTires)[0];
+            if (t) {
+                let finalValidity = true;
+                let failDetail = [];
 
-            // 🚀 Minutes converties en MS (* 60000) au lieu de secondes (* 60)
-            let regOpenSec = (i + 1) * splitDurSec - (winOpen * 60000);
-            let regCloseSec = (i + 1) * splitDurSec + (winClose * 60000);
+                if (startedLate) {
+                    let prevHasSameTire = false;
+                    if (i > 0) {
+                        let prevStints = strategySplits[i - 1].stints;
+                        if (prevStints[prevStints.length - 1].tire === t) prevHasSameTire = true;
+                    }
+                    if (!prevHasSameTire) {
+                        finalValidity = false;
+                        failDetail.push("Démarré trop tard");
+                    }
+                }
 
-            if (finalSec < regOpenSec || finalSec > regCloseSec) {
-                if (!rulesErrors.includes("Changements de pilote hors fenêtre IRL détectés.")) rulesErrors.push("Changements de pilote hors fenêtre IRL détectés.");
+                if (endedEarly) {
+                    let nextHasSameTire = false;
+                    if (i < strategySplits.length - 1) {
+                        if (strategySplits[i + 1].stints[0].tire === t) nextHasSameTire = true;
+                    }
+                    if (!nextHasSameTire) {
+                        finalValidity = false;
+                        failDetail.push("Terminé trop tôt");
+                    }
+                }
+
+                if (finalValidity) {
+                    tireFullSplits[t]++;
+                } else {
+                    let termLabel = (raceType === 'online') ? 'Relais' : 'Split';
+                    tireFails[t].push(`${termLabel} ${i + 1} (${failDetail.join(' et ')})`);
+                }
             }
         }
     }
 
-    if (tireRule && tireRule !== 'none') {
-        let missing = [];
-        getAvailableDrivers().forEach(d => {
-            if ((tireUsage[d] || 0) < reqTireCount) missing.push(d);
-        });
-        if (missing.length > 0) {
-            rulesErrors.push(`Pilotes manquant de gommes ${tireRule} : ${missing.join(', ')}`);
-        }
+    let raceTires = new Set();
+    let totalPits = 0;
+    strategySplits.forEach(sp => {
+        sp.stints.forEach(s => raceTires.add(s.tire));
+        totalPits += sp.stints.length;
+    });
+    totalPits -= strategySplits.length;
+
+    if (reqTireChange) {
+        let ok = raceTires.size >= 2;
+        let colClass = ok ? 'text-success' : 'text-danger';
+        bilanHTML += `<li>Gommes (Course) : <span class="${colClass}">${raceTires.size} / 2 types</span></li>`;
+        if (!ok) rulesErrors.push(`Course: 2 types de gommes requis.`);
     }
+
+    if (reqPits > 0 && (!isOnline || isSolo)) {
+        let ok = totalPits >= reqPits;
+        let colClass = ok ? 'text-success' : 'text-danger';
+        bilanHTML += `<li>Arrêts (Course) : <span class="${colClass}">${totalPits} / ${reqPits}</span></li>`;
+        if (!ok) rulesErrors.push(`Course: ${reqPits} arrêt(s) requis.`);
+    }
+
+    let reqSplits = parseInt(document.getElementById('mandatory-splits')?.value) || 0;
+    if (reqSplits > 0 && !isSolo) {
+        let termName = (raceType === 'online') ? 'relais' : 'splits';
+        getAvailableDrivers().forEach(d => {
+            let count = splitCount[d] || 0;
+            let ok = count >= reqSplits;
+            let colClass = ok ? 'text-success' : 'text-danger';
+            bilanHTML += `<li>Pilote ${d} : <span class="${colClass}">${count} / ${reqSplits} ${termName}</span></li>`;
+            if (!ok) rulesErrors.push(`Pilote ${d} : ${count}/${reqSplits} ${termName}.`);
+        });
+    }
+
+    bilanHTML += "</ul><div class='mt-15 pt-10 border-top-dashed'><ul class='list-unstyled'>";
+
+    ['T', 'M', 'D', 'I', 'P'].forEach(t => {
+        if (document.getElementById(`use-${t}`)?.checked) {
+            let reqFull = parseInt(document.getElementById(`val-${t}-1`)?.value);
+            let reqMin = parseInt(document.getElementById(`val-${t}-2`)?.value);
+            let reqMax = parseInt(document.getElementById(`val-${t}-3`)?.value);
+            let hasFull = document.getElementById(`cb-${t}-1`)?.checked && reqFull > 0;
+            let hasMin = document.getElementById(`cb-${t}-2`)?.checked && reqMin > 0;
+            let hasMax = document.getElementById(`cb-${t}-3`)?.checked && reqMax > 0;
+
+            let term = (raceType === 'online') ? 'Relais' : 'Split';
+            bilanHTML += `<li class="mb-5"><strong>Gomme ${t} :</strong><br>`;
+
+            if (!hasFull && !hasMin && !hasMax) {
+                bilanHTML += `<span class="text-success">Libre (${tireTrains[t]} train(s) utilisé(s))</span><br>`;
+            } else {
+                if (hasFull) {
+                    let ok = tireFullSplits[t] >= reqFull;
+                    let colClass = ok ? 'text-success' : 'text-danger';
+                    bilanHTML += `<span class="${colClass}">${term} complets : ${tireFullSplits[t]} / ${reqFull}</span><br>`;
+                    if (!ok) {
+                        rulesErrors.push(`Gomme ${t} : ${reqFull} ${term} complets requis.`);
+                        if (tireFails[t] && tireFails[t].length > 0) {
+                            bilanHTML += `<div class="text-warning fs-085 ml-15 mt-5">⚠️ Refusé(s) : ${tireFails[t].join(', ')}</div>`;
+                        }
+                    }
+                }
+                if (hasMin) {
+                    let ok = tireTrains[t] >= reqMin;
+                    let colClass = ok ? 'text-success' : 'text-danger';
+                    bilanHTML += `<span class="${colClass}">Trains utilisés : ${tireTrains[t]} / ${reqMin}</span><br>`;
+                    if (!ok) rulesErrors.push(`Gomme ${t} : Minimum ${reqMin} trains.`);
+                }
+                if (hasMax) {
+                    let ok = tireTrains[t] <= reqMax;
+                    let colClass = ok ? 'text-success' : 'text-danger';
+                    bilanHTML += `<span class="${colClass}">Trains limités : ${tireTrains[t]} / ${reqMax}</span><br>`;
+                    if (!ok) rulesErrors.push(`Gomme ${t} : Maximum ${reqMax} trains.`);
+                }
+            }
+            bilanHTML += `</li>`;
+        }
+    });
+
+    bilanHTML += "</ul></div>";
+    document.getElementById('bilan-content').innerHTML = bilanHTML;
 
     window.hasGlobalAlert = (rulesErrors.length > 0);
     window.globalAlertText = rulesErrors.join(" | ");

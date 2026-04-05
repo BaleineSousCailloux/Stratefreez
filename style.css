@@ -2105,10 +2105,9 @@ svg.live-grey-icon {
         .active-live-stint td::after {
             content: "";
             position: absolute;
-            left: 0;
-            right: 0; /* Étend la barre sur toute la largeur de la cellule */
+            left: -20px;
+            right: -20px; /* Étend la barre sur toute la largeur de la cellule */
             height: 40px !important;
-            width: 100% !important;
             background-color: transparent;
             z-index: 10;
             pointer-events: none; /* Empêche les barres de bloquer les clics */
@@ -2128,24 +2127,24 @@ svg.live-grey-icon {
     @keyframes pulse-lines-top {
         0%, 100% {
             /*height: 2px;*/
-            box-shadow: 0 2px 5px rgba(37, 253, 233, 0.15);
+            box-shadow: inset 0 2px 5px rgba(37, 253, 233, 0.15);
         }
 
         50% {
             /*height: 10px; La barre s'épaissit vers l'intérieur */
-            box-shadow: 0 10px 20px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
+            box-shadow: inset 0 10px 20px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
         }
     }
 
     @keyframes pulse-lines-bottom {
         0%, 100% {
             /*height: 2px;*/
-            box-shadow: 0 -2px 5px rgba(37, 253, 233, 0.15);
+            box-shadow: inset 0 -2px 5px rgba(37, 253, 233, 0.15);
         }
 
         50% {
             /*height: 10px; La barre s'épaissit vers l'intérieur */
-            box-shadow: 0 -10px 20px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
+            box-shadow: inset 0 -10px 20px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
         }
     }
 }

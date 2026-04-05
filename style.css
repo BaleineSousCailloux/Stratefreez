@@ -2107,23 +2107,24 @@ svg.live-grey-icon {
             position: absolute;
             left: 0;
             right: 0; /* Étend la barre sur toute la largeur de la cellule */
-            height: 30px;
+            height: 40px;
             background-color: transparent;
-            animation: pulse-lines 2s infinite !important;
             z-index: 10;
             pointer-events: none; /* Empêche les barres de bloquer les clics */
         }
 
         .active-live-stint td::before {
             top: 0;
+            animation: pulse-lines-top 2s infinite !important;
         }
 
         .active-live-stint td::after {
             bottom: 0;
+            animation: pulse-lines-bottom 2s infinite !important;
         }
 
     /* 3. L'animation de l'épaisseur et du halo des barres */
-    @keyframes pulse-lines {
+    @keyframes pulse-lines-top {
         0%, 100% {
             /*height: 2px;*/
             box-shadow: 0 2px 5px rgba(37, 253, 233, 0.15);
@@ -2132,6 +2133,18 @@ svg.live-grey-icon {
         50% {
             /*height: 10px; La barre s'épaissit vers l'intérieur */
             box-shadow: 0 10px 20px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
+        }
+    }
+
+    @keyframes pulse-lines-bottom {
+        0%, 100% {
+            /*height: 2px;*/
+            box-shadow: 0 -2px 5px rgba(37, 253, 233, 0.15);
+        }
+
+        50% {
+            /*height: 10px; La barre s'épaissit vers l'intérieur */
+            box-shadow: 0 -10px 20px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
         }
     }
 }

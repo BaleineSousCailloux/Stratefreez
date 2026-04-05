@@ -2107,7 +2107,8 @@ svg.live-grey-icon {
             position: absolute;
             left: 0;
             right: 0; /* Étend la barre sur toute la largeur de la cellule */
-            height: 40px;
+            height: 40px !important;
+            width: 100% !important;
             background-color: transparent;
             z-index: 10;
             pointer-events: none; /* Empêche les barres de bloquer les clics */

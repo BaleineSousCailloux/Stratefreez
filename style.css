@@ -5,6 +5,11 @@
     font-family: 'Roboto', sans-serif;
 }
 
+:root {
+    /* 🚀 Empêche les navigateurs mobiles de tenter d'assombrir vos belles couleurs claires (rose/vert) */
+    color-scheme: dark;
+}
+
 body {
     background-color: #1e1e1e;
     color: #f5f5f5;
@@ -967,9 +972,10 @@ input.table-input:disabled {
     justify-content: center;
     width: 20px;
     height: 20px;
-    background-color: #82b1ff;
+    background: #82b1ff;
     border-radius: 50%;
     flex-shrink: 0;
+    background-image: none !important; /* TUE le dégradé natif du mode sombre mobile */
 }
 
     .blue-arrow-bg .material-symbols-outlined {
@@ -984,6 +990,7 @@ input.table-input:disabled {
     -moz-appearance: none;
     appearance: none;
     text-align-last: center;
+    background-image: none !important; /* TUE le dégradé natif du mode sombre mobile */
 }
 
 .table-select {
@@ -1057,7 +1064,10 @@ select:disabled, input:disabled, .locked-sim {
 }
 
 .finish-line-placeholder {
-    background: repeating-conic-gradient(#1e1e1e 0 90deg, #fff 0 180deg) 0 0/12px 12px !important;
+    /* 🚀 FIX : On sépare l'image et la taille pour ne pas faire planter les parseurs mobiles */
+    background-image: repeating-conic-gradient(#1e1e1e 0 90deg, #fff 0 180deg) !important;
+    background-size: 12px 12px !important;
+    background-color: transparent !important;
     color: transparent !important;
     border-color: #555 !important;
     box-shadow: none !important;
@@ -1938,45 +1948,52 @@ select:disabled, input:disabled, .locked-sim {
 
 /* Pastilles & Icones */
 .bg-tire-T {
-    background-color: #ff5252 !important;
+    background: #ff5252 !important;
     color: #fff !important;
     font-weight: bold;
+    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-tire-M {
-    background-color: #ffeb3b !important;
+    background: #ffeb3b !important;
     color: #000 !important;
     font-weight: bold;
+    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-tire-D {
-    background-color: #e0e0e0 !important;
+    background: #e0e0e0 !important;
     color: #000 !important;
     font-weight: bold;
+    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-tire-I {
-    background-color: #4caf50 !important;
+    background: #4caf50 !important;
     color: #fff !important;
     font-weight: bold;
+    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-tire-P {
-    background-color: #2196f3 !important;
+    background: #2196f3 !important;
     color: #fff !important;
     font-weight: bold;
+    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-fuel-eco {
-    background-color: #c8e6c9 !important;
+    background: #c8e6c9 !important;
     color: #1b5e20 !important;
     font-weight: bold;
+    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-fuel-push {
-    background-color: #f8bbd0 !important;
+    background: #f8bbd0 !important;
     color: #880e4f !important;
     font-weight: bold;
+    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .live-fuel-pill {

@@ -864,18 +864,23 @@ input.table-input:disabled {
     border: 2px solid #cc2d53 !important; /* Bordure rouge vif */
     color: #ff5252 !important; /* Chiffre rouge pour l'alerte */
     font-weight: bold;
-    /* On s'assure que le champ ne réserve pas d'espace pour les boutons */
-    display: block;
+    /* 🛡️ SOLUTION LOGIQUE : On force l'apparence "textfield" pour détruire le slot interne */
+    -webkit-appearance: none !important;
+    -moz-appearance: textfield !important;
+    appearance: none !important;
+    /* On retire tout padding résiduel à droite qui pourrait laisser voir le fond gris */
+    padding-right: 2px !important;
+    text-align: center;
 }
 
-    /* Bloc spécifique pour cacher les flèches sur Chrome/Edge/Safari (PC) */
+    /* 🖥️ NETTOYAGE COMPLET des résidus internes pour Chrome/Edge/Safari */
     input.table-input:disabled::-webkit-inner-spin-button,
-    input.table-input:disabled::-webkit-outer-spin-button {
+    input.table-input:disabled::-webkit-outer-spin-button,
+    input.table-input:disabled::-webkit-clear-button,
+    input.table-input:disabled::-webkit-search-cancel-button {
         -webkit-appearance: none !important;
-        display: none !important; /* 🚀 AJOUT : On force le display none en plus de l'appearance */
+        display: none !important;
         margin: 0 !important;
-        width: 0 !important; /* 🚀 AJOUT : On réduit sa taille à néant */
-        height: 0 !important;
     }
 
 /* Fuel Cell (Tableau) */

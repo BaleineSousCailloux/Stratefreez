@@ -16,6 +16,7 @@ let fuelModalTarget = null;
 let lastActiveStint = localStorage.getItem('lastActiveStint') || null;
 // 🚀 NOUVEAU : Empreinte d'état (Remplace le boolean needsStrategyUpdate)
 let lastCalculatedState = null;
+let liveStandbyTimeout = null;
 
 // ==========================================
 // --- NOUVEAU : HORLOGE ATOMIQUE (0 Quota) ---
@@ -250,6 +251,35 @@ function updateAlertVisibility() {
     }
 }
 
+function updateLiveStandbyState(isStopAction = false) {
+    let overlay = document.getElementById('live-standby-overlay');
+    if (!overlay) return;
+
+    // Si on n'est pas ingénieur, l'écran de départ n'existe pas
+    if (!isEngineerMode) {
+        overlay.classList.add('hidden');
+        return;
+    }
+
+    if (liveTimerActive) {
+        // Chrono lancé : On cache l'écran et on annule tout délai
+        overlay.classList.add('hidden');
+        clearTimeout(liveStandbyTimeout);
+    } else {
+        // Chrono arrêté
+        if (isStopAction) {
+            // Clic sur Stop : On attend 5 min (300 000 ms) avant de réafficher le bouton
+            clearTimeout(liveStandbyTimeout);
+            liveStandbyTimeout = setTimeout(() => {
+                if (!liveTimerActive) overlay.classList.remove('hidden');
+            }, 300000);
+        } else {
+            // Affichage normal quand on navigue sans chrono actif
+            overlay.classList.remove('hidden');
+        }
+    }
+}
+
 function openTab(tabId) {
     // 🚀 LE NETTOYEUR : On détruit le focus fantôme instantanément au changement d'onglet
     // (Baisse le bouclier et force la validation de n'importe quelle case en cours d'édition)
@@ -312,6 +342,7 @@ function openTab(tabId) {
     if (tabId === 'tab-export') {
         generateIARequest();
     }
+    if (tabId === 'tab-live') updateLiveStandbyState();
 }
 
 // ==========================================
@@ -1727,6 +1758,8 @@ function startLiveTimer(splitIdx) {
     };
     localStorage.setItem('stratefreez-timer', JSON.stringify(timerState));
 
+    updateLiveStandbyState(); // Masque le bouton immédiatement
+
     saveFormState();
     renderStrategy();
     runTimerLoop();
@@ -2203,6 +2236,7 @@ function stopTimer(isRaceEnd) {
 
     renderStrategy();
     updateLiveSpotter(0, null);
+    updateLiveStandbyState(true); // Lance le compte à rebours de 5 minutes
 }
 
 function loadTimerState() {
@@ -4030,6 +4064,8 @@ function renderStrategy() {
 
     let strTimer = localStorage.getItem('stratefreez-timer');
     let timerState = strTimer ? JSON.parse(strTimer) : null;
+    let alertBanner = document.getElementById('global-objective-alert');
+    let isGlobalObjectiveMet = true; // 🚀 Notre capteur
 
     for (let i = 0; i < strategySplits.length; i++) {
         let split = strategySplits[i];
@@ -4210,6 +4246,7 @@ function renderStrategy() {
             if (goal === 'time') {
                 let targetSec = totalSecRace / splitsCount;
                 let isMet = splitEndSec >= targetSec;
+                if (!isMet) isGlobalObjectiveMet = false; // 🚀 CAPTURE
                 let colClass = isMet ? 'text-success' : 'text-danger';
                 let msg = isMet ? `🏁 Objectif atteint : ${splitLaps} tours en ${formatTime(splitEndSec)}` : `⚠️ Objectif non atteint (Cible: ${formatTime(targetSec)})`;
                 goalHTML = `<strong class="${colClass}">${msg}</strong>`;
@@ -4218,6 +4255,7 @@ function renderStrategy() {
                 let targetPerRelay = Math.floor(targetLaps / splitsCount);
                 if (i === strategySplits.length - 1) targetPerRelay = targetLaps - (i * targetPerRelay);
                 let isMet = splitLaps >= targetPerRelay;
+                if (!isMet) isGlobalObjectiveMet = false; // 🚀 CAPTURE
                 let colClass = isMet ? 'text-success' : 'text-danger';
                 let msg = isMet ? `🏁 Objectif ${isSolo ? 'atteint' : 'relais'} : ${splitLaps} / ${targetPerRelay} tours` : `⚠️ Objectif ${isSolo ? 'non atteint' : 'relais'} : ${splitLaps} / ${targetPerRelay} tours`;
                 goalHTML = `<strong class="${colClass}">${msg}</strong>`;
@@ -4226,12 +4264,14 @@ function renderStrategy() {
             if (isLastSplit) {
                 if (goal === 'time') {
                     let isMet = splitEndSec >= totalSecRace;
+                    if (!isMet) isGlobalObjectiveMet = false; // 🚀 CAPTURE
                     let colClass = isMet ? 'text-success' : 'text-danger';
                     let msg = `🏁 Fin de course : ${formatTime(splitEndSec)} (Cible: ${formatTime(totalSecRace)})`;
                     goalHTML = `<strong class="${colClass}">${msg}</strong>`;
                 } else {
                     let targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
                     let isMet = split.stints[split.stints.length - 1].endLap >= targetLaps;
+                    if (!isMet) isGlobalObjectiveMet = false; // 🚀 CAPTURE
                     let colClass = isMet ? 'text-success' : 'text-danger';
                     let msg = `🏁 Objectif de course : ${split.stints[split.stints.length - 1].endLap} / ${targetLaps} tours`;
                     goalHTML = `<strong class="${colClass}">${msg}</strong>`;
@@ -4496,6 +4536,14 @@ function renderStrategy() {
     if (localSaveInput) {
         let raceNameInput = document.getElementById('race-name-input');
         localSaveInput.value = (currentRaceId && raceNameInput) ? raceNameInput.value : "";
+    }
+    // 🚀 AFFICHAGE DU BANDEAU ROUGE
+    if (alertBanner) {
+        if (isGlobalObjectiveMet) {
+            alertBanner.classList.add('hidden');
+        } else {
+            alertBanner.classList.remove('hidden');
+        }
     }
 }
 

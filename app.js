@@ -3851,21 +3851,27 @@ function checkGlobalRules() {
 }
 
 function renderStrategy() {
-    // [Garder tout le début de la fonction tel quel, on change l'intérieur de la boucle principale]
     const container = document.getElementById('strategy-blocks-container');
     container.innerHTML = '';
     const raceType = document.getElementById('race-type')?.value || 'irl';
     const goal = document.getElementById('race-goal')?.value;
     const isOnline = (raceType === 'online');
     const isSolo = (parseInt(document.getElementById('num-drivers').value) === 1);
-    let drvOptsArr = getAvailableDrivers(); let sptOptsArr = getAvailableSpotters(); let tireOptsArr = getAvailableTires();
+
+    let drvOptsArr = getAvailableDrivers();
+    let sptOptsArr = getAvailableSpotters();
+    let tireOptsArr = getAvailableTires();
     let initialFuel = parseFloat(document.getElementById('fuel-start').value.replace(/[^\d.]/g, '')) || 100;
-    let grandTotalLaps = 0; let totalSecRace = getRaceDurationSeconds(); // 🚀 MS
+
+    let grandTotalLaps = 0;
+    let totalSecRace = getRaceDurationSeconds(); // 🚀 MS
     let splitsCount = parseInt(document.getElementById('total-splits').value) || 1;
     let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0; // 🚀 MS
     let relayIndexTracker = 0;
-    let strTimer = localStorage.getItem('stratefreez-timer'); let timerState = strTimer ? JSON.parse(strTimer) : null;
-    let alertBanner = document.getElementById('global-objective-alert'); let isGlobalObjectiveMet = true;
+
+    let strTimer = localStorage.getItem('stratefreez-timer');
+    let timerState = strTimer ? JSON.parse(strTimer) : null;
+    let isGlobalObjectiveMet = true;
 
     for (let i = 0; i < strategySplits.length; i++) {
         let split = strategySplits[i];
@@ -3874,6 +3880,7 @@ function renderStrategy() {
         let isRelayStart = (i === 0) || (isOnline ? true : (split.driver !== strategySplits[i - 1].driver));
 
         if (isRelayStart) relayIndexTracker++;
+
         let relayClass = "";
         if (!isOnline && !isSolo) {
             let prevSame = (i > 0 && split.driver === strategySplits[i - 1].driver);
@@ -3885,11 +3892,17 @@ function renderStrategy() {
             }
         }
 
-        let splitTitle = (isOnline || isSolo) ? (drvOptsArr.length > 1 ? "RELAIS " + (i + 1) : "COURSE") : "SPLIT " + (i + 1);
+        let splitTitle = "SPLIT " + (i + 1);
+        if (isOnline || isSolo) {
+            splitTitle = drvOptsArr.length > 1 ? "RELAIS " + (i + 1) : "COURSE";
+        }
 
         let realStartSec = 0;
-        if (isOnline || isSolo) realStartSec = timeStringToSeconds(document.getElementById(`start-time-${i + 1}`)?.value || "00:00");
-        else realStartSec = timeStringToSeconds(document.getElementById(`start-time-1`)?.value || "00:00") + (i * splitDurSec);
+        if (isOnline || isSolo) {
+            realStartSec = timeStringToSeconds(document.getElementById(`start-time-${i + 1}`)?.value || "00:00");
+        } else {
+            realStartSec = timeStringToSeconds(document.getElementById(`start-time-1`)?.value || "00:00") + (i * splitDurSec);
+        }
 
         // 🚀 AFFICHAGE : Conversion ms -> sec -> heures
         let displayStartSec = Math.round(realStartSec / 1000);
@@ -3897,6 +3910,7 @@ function renderStrategy() {
         let rsM = String(Math.floor((displayStartSec % 3600) / 60)).padStart(2, '0');
 
         let drvOpts = drvOptsArr.map(d => `<option value="${d}" ${d === split.driver ? 'selected' : ''}>${d}</option>`).join('');
+
         let validSpotters = sptOptsArr.filter(s => s !== split.driver);
         let sptOpts = validSpotters.map(s => `<option value="${s}" ${s === split.spotter ? 'selected' : ''}>${s}</option>`).join('');
         let sptSelectHTML = validSpotters.length ? `<select class="header-spotter" onchange="updateSplitData(${i}, 'spotter', this.value)"><option value="">Sans Spotter</option>${sptOpts}</select>` : '';
@@ -3905,10 +3919,14 @@ function renderStrategy() {
         let pasteBtn = clipboardStints ? `<span class="material-symbols-outlined icon-action paste-active" title="Coller la stratégie" onclick="pasteSplit(${i})">content_paste</span>` : '';
 
         let startBtn = '';
-        if (!split.isFinished) {
+        let isFinished = split.isFinished;
+
+        if (!isFinished) {
             if ((!isOnline && i === 0) || isOnline) {
                 let isRunning = timerState && timerState.active && ((!isOnline) || (isOnline && timerState.splitIdx === i));
-                if (!isRunning) startBtn = `<button class="action-btn start-btn" onclick="startLiveTimer(${i})"><span class="material-symbols-outlined icon-sm">play_arrow</span> START</button>`;
+                if (!isRunning) {
+                    startBtn = `<button class="action-btn start-btn" onclick="startLiveTimer(${i})"><span class="material-symbols-outlined icon-sm">play_arrow</span> START</button>`;
+                }
             }
         }
 
@@ -3920,20 +3938,28 @@ function renderStrategy() {
             let isHistorical = stint.isPitted;
             let disabledAttr = isHistorical ? 'disabled' : '';
 
-            let isLockedStint = (!isHistorical) ? ((isOnline || isSolo) ? isFinalStintOfBlock : (isLastSplit && isFinalStintOfBlock)) : false;
+            let isLockedStint = false;
+            if (!isHistorical) {
+                isLockedStint = (isOnline || isSolo) ? isFinalStintOfBlock : (isLastSplit && isFinalStintOfBlock);
+            }
 
-            let lockedTire = (!isAbsoluteFirst && !stint.changeTires && !isHistorical) ? ((j > 0) ? split.stints[j - 1].tire : strategySplits[i - 1].stints[strategySplits[i - 1].stints.length - 1].tire) : null;
+            let lockedTire = (!isAbsoluteFirst && !stint.changeTires && !isHistorical) ?
+                ((j > 0) ? split.stints[j - 1].tire : strategySplits[i - 1].stints[strategySplits[i - 1].stints.length - 1].tire) : null;
+
             let targetFuelForStint = (stint.manualFuel !== null && stint.manualFuel !== undefined) ? parseFloat(stint.manualFuel) : (stint.cachedTargetFuel || 100);
 
             // 🚀 AFFICHAGE : Conversion du pit time en ms vers secondes
             let pitStr = isAbsoluteFirst ? "Départ" : (stint.pitTime ? Math.ceil(stint.pitTime / 1000) + "s" : "-");
+
             let cbPneusHTML = isAbsoluteFirst ? `<input type="checkbox" disabled checked title="Départ">` : `<input type="checkbox" ${stint.changeTires ? 'checked' : ''} ${disabledAttr} onchange="updateStintData(${i}, ${j}, 'changeTires', this.checked)">`;
 
             let noFuelFlag = !isAbsoluteFirst && (stint.fuelAddedAtStart === 0);
             let pitDisplay = (!isAbsoluteFirst && noFuelFlag) ? `<span class="pit-no-fuel text-success" title="PIT sans essence">${pitStr}</span>` : pitStr;
 
             let tOpts = tireOptsArr.map(t => `<option value="${t}" class="bg-tire-${t}" ${t === stint.tire ? 'selected' : ''}>${t}</option>`).join('');
-            let tireSelectHTML = (lockedTire && !isAbsoluteFirst) ? `<div class="table-select locked-sim flex-center">${lockedTire} <span class="material-symbols-outlined icon-sm">lock</span></div>` : `<select class="table-select ${stint.tire ? `bg-tire-${stint.tire}` : ''}" ${disabledAttr} onchange="updateStintData(${i}, ${j}, 'tire', this.value)">${tOpts}</select>`;
+            let tClass = stint.tire ? `bg-tire-${stint.tire}` : '';
+            let lockIconText = `<span class="material-symbols-outlined icon-sm ml-5 icon-align-middle">lock</span>`;
+            let tireSelectHTML = (lockedTire && !isAbsoluteFirst) ? `<div class="table-select locked-sim flex-center">${lockedTire} ${lockIconText}</div>` : `<select class="table-select ${tClass}" ${disabledAttr} onchange="updateStintData(${i}, ${j}, 'tire', this.value)">${tOpts}</select>`;
 
             // 🚀 AFFICHAGE : Conversion du endSec
             let displayEnd = Math.round((stint.endSec || 0) / 1000);
@@ -3946,16 +3972,32 @@ function renderStrategy() {
             if (isHistorical) trClass += ' is-historical';
 
             let fuelClass = `bg-fuel-${stint.fuelStrat}`;
+            let fuelRateDisplay = (stint.fuelRate || 0).toFixed(2) + " L/t";
             let manualFuelClass = stint.manualFuel !== null ? 'manual-override-text' : '';
-            let fuelCellHTML = isAbsoluteFirst ? `<span class="px-5 py-2">${initialFuel.toFixed(1)}<span class="unite"> L</span></span>` : (isHistorical ? `<span class="inline-block px-5 py-2">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>` : `<span class="inline-block cursor-pointer px-5 py-2 border-radius-4 ${manualFuelClass}" onclick="openFuelModal(${i}, ${j}, ${stint.cachedTargetFuel})">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>`);
 
-            let lapsInputHTML = (isLockedStint || isHistorical) ? `<input type="text" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` : `<input type="number" inputmode="decimal" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
+            let fuelCellHTML = isAbsoluteFirst ? `<span class="px-5 py-2">${initialFuel.toFixed(1)}<span class="unite"> L</span></span>` :
+                (isHistorical ? `<span class="inline-block px-5 py-2">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>` :
+                    `<span class="inline-block cursor-pointer px-5 py-2 border-radius-4 ${manualFuelClass}" onclick="openFuelModal(${i}, ${j}, ${stint.cachedTargetFuel})">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>`);
+
+            let lapsInputHTML = (isLockedStint || isHistorical) ?
+                `<input type="text" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` :
+                `<input type="number" inputmode="decimal" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
 
             let isUltimateStint = isOnline ? (j === split.stints.length - 1) : (isLastSplit && j === split.stints.length - 1);
-            let actionBtnHTML = isUltimateStint ? `<button class="action-btn pit-btn finish-line-placeholder" title="Ligne d'arrivée">PIT<span class="hide-on-mobile"> IN</span></button>` : (isHistorical ? `<button class="action-btn btn-invisible" onclick="openUndoPitModal(${i}, ${j}, ${stint.laps})" title="Annuler le PIT IN">✅</button>` : `<button class="action-btn magic-btn pit-btn" onclick="openPitModal(${i}, ${j}, ${stint.startLap}, ${stint.endLap})">PIT<span class="hide-on-mobile"> IN</span></button>`);
+            let actionBtnHTML = "";
+
+            if (isUltimateStint) {
+                actionBtnHTML = `<button class="action-btn pit-btn finish-line-placeholder" title="Ligne d'arrivée">PIT<span class="hide-on-mobile"> IN</span></button>`;
+            } else {
+                actionBtnHTML = isHistorical ?
+                    `<button class="action-btn btn-invisible" onclick="openUndoPitModal(${i}, ${j}, ${stint.laps})" title="Annuler le PIT IN">✅</button>` :
+                    `<button class="action-btn magic-btn pit-btn" onclick="openPitModal(${i}, ${j}, ${stint.startLap}, ${stint.endLap})">PIT<span class="hide-on-mobile"> IN</span></button>`;
+            }
+
+            let timeClass = isFinalStintOfBlock ? "last-stint-highlight" : "time-cell";
 
             tableRowsHTML += `
-            <tr data-stint="${i}-${j}" class="${trClass}">
+            <tr data-stint="${i}-${j}" data-split-idx="${i}" data-start-sec="${stint.startSec}" data-end-sec="${stint.endSec}" class="${trClass}">
                 <td class="zone-pit">${cbPneusHTML}</td>
                 <td class="zone-pit fuel-cell">${fuelCellHTML}</td>
                 <td class="zone-pit zone-border">${pitDisplay}</td>
@@ -3966,18 +4008,36 @@ function renderStrategy() {
                             <option value="push" class="bg-fuel-push" ${stint.fuelStrat === 'push' ? 'selected' : ''}>Attack</option>
                             <option value="eco" class="bg-fuel-eco" ${stint.fuelStrat === 'eco' ? 'selected' : ''}>Éco</option>
                         </select>
-                        <span class="fuel-rate-display ${fuelClass}">${(stint.fuelRate || 0).toFixed(2)} L/t</span>
+                        <span class="fuel-rate-display ${fuelClass}">${fuelRateDisplay}</span>
                     </div>
                 </td>
                 <td class="zone-config zone-border"><div class="input-cell">${lapsInputHTML}</div></td>
                 <td class="zone-end">${actionBtnHTML}</td>
-                <td class="zone-end zone-border fin-stint-cell"><div class="fin-stint-wrapper"><div class="tour-block"><span class="blue-arrow-bg"><span class="material-symbols-outlined">arrow_forward</span></span><span class="tour-number">${stint.endLap}</span></div><div class="time-block"><span class="${isFinalStintOfBlock ? "last-stint-highlight" : "time-cell"}">${timeStr}</span></div></div></td>
-                <td class="delete-cell">${isHistorical ? `<span class="material-symbols-outlined text-grey fs-20" title="Verrouillé">lock</span>` : `<button class="btn-delete" title="Supprimer ce stint" onclick="openDeleteModal(${i}, ${j})"><span class="material-symbols-outlined fs-20">delete</span></button>`}</td>
-            </tr>`;
-            if (i === strategySplits.length - 1 && j === split.stints.length - 1) grandTotalLaps = stint.endLap;
+                <td class="zone-end zone-border fin-stint-cell">
+                    <div class="fin-stint-wrapper">
+                        <div class="tour-block">
+                            <span class="blue-arrow-bg"><span class="material-symbols-outlined">arrow_forward</span></span>
+                            <span class="tour-number">${stint.endLap}</span>
+                        </div>
+                        <div class="time-block">
+                            <span class="${timeClass}">${timeStr}</span>
+                        </div>
+                    </div>
+                </td>
+                <td class="delete-cell">
+                    ${isHistorical ? `<span class="material-symbols-outlined text-grey fs-20" title="Verrouillé">lock</span>` : `<button class="btn-delete" title="Supprimer ce stint" onclick="openDeleteModal(${i}, ${j})"><span class="material-symbols-outlined fs-20">delete</span></button>`}
+                </td>
+            </tr>
+            `;
+
+            if (i === strategySplits.length - 1 && j === split.stints.length - 1) {
+                grandTotalLaps = stint.endLap;
+            }
         }
 
-        let goalHTML = ""; let windowHTML = "";
+        let goalHTML = "";
+        let windowHTML = "";
+
         let splitEndSec = split.stints[split.stints.length - 1].endSec || 0;
         let splitLaps = (split.stints[split.stints.length - 1].endLap || 0) - (split.stints[0].startLap || 0);
 
@@ -3986,32 +4046,41 @@ function renderStrategy() {
                 let targetSec = totalSecRace / splitsCount;
                 let isMet = splitEndSec >= targetSec - 10; // 🚀 MICRO-TOLERANCE
                 if (!isMet) isGlobalObjectiveMet = false;
-                goalHTML = `<strong class="${isMet ? 'text-success' : 'text-danger'}">${isMet ? `🏁 Objectif atteint : ${splitLaps} tours en ${formatTime(splitEndSec)}` : `⚠️ Objectif non atteint (Cible: ${formatTime(targetSec)})`}</strong>`;
+                let colClass = isMet ? 'text-success' : 'text-danger';
+                let msg = isMet ? `🏁 Objectif atteint : ${splitLaps} tours en ${formatTime(splitEndSec)}` : `⚠️ Objectif non atteint (Cible: ${formatTime(targetSec)})`;
+                goalHTML = `<strong class="${colClass}">${msg}</strong>`;
             } else {
-                let targetPerRelay = Math.floor((parseInt(document.getElementById('race-laps')?.value) || 0) / splitsCount);
-                if (isLastSplit) targetPerRelay = (parseInt(document.getElementById('race-laps')?.value) || 0) - (i * targetPerRelay);
+                let targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
+                let targetPerRelay = Math.floor(targetLaps / splitsCount);
+                if (isLastSplit) targetPerRelay = targetLaps - (i * targetPerRelay);
                 let isMet = splitLaps >= targetPerRelay;
                 if (!isMet) isGlobalObjectiveMet = false;
-                goalHTML = `<strong class="${isMet ? 'text-success' : 'text-danger'}">${isMet ? `🏁 Objectif atteint : ${splitLaps} / ${targetPerRelay} tours` : `⚠️ Objectif non atteint : ${splitLaps} / ${targetPerRelay} tours`}</strong>`;
+                let colClass = isMet ? 'text-success' : 'text-danger';
+                let msg = isMet ? `🏁 Objectif atteint : ${splitLaps} / ${targetPerRelay} tours` : `⚠️ Objectif non atteint : ${splitLaps} / ${targetPerRelay} tours`;
+                goalHTML = `<strong class="${colClass}">${msg}</strong>`;
             }
         } else {
             if (isLastSplit) {
                 if (goal === 'time') {
                     let isMet = splitEndSec >= totalSecRace - 10; // 🚀 MICRO-TOLERANCE
                     if (!isMet) isGlobalObjectiveMet = false;
-                    goalHTML = `<strong class="${isMet ? 'text-success' : 'text-danger'}">${isMet ? `🏁 Fin de course : ${formatTime(splitEndSec)} (Cible: ${formatTime(totalSecRace)})` : `⚠️ Objectif non atteint (Cible: ${formatTime(totalSecRace)})`}</strong>`;
+                    let colClass = isMet ? 'text-success' : 'text-danger';
+                    let msg = `🏁 Fin de course : ${formatTime(splitEndSec)} (Cible: ${formatTime(totalSecRace)})`;
+                    goalHTML = `<strong class="${colClass}">${msg}</strong>`;
                 } else {
                     let targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
                     let isMet = split.stints[split.stints.length - 1].endLap >= targetLaps;
                     if (!isMet) isGlobalObjectiveMet = false;
-                    goalHTML = `<strong class="${isMet ? 'text-success' : 'text-danger'}">${isMet ? `🏁 Objectif de course : ${split.stints[split.stints.length - 1].endLap} / ${targetLaps} tours` : `⚠️ Objectif non atteint : ${split.stints[split.stints.length - 1].endLap} / ${targetLaps} tours`}</strong>`;
+                    let colClass = isMet ? 'text-success' : 'text-danger';
+                    let msg = `🏁 Objectif de course : ${split.stints[split.stints.length - 1].endLap} / ${targetLaps} tours`;
+                    goalHTML = `<strong class="${colClass}">${msg}</strong>`;
                 }
             }
         }
 
         let hasPitWindow = document.getElementById('enable-pit-window')?.checked;
+
         if (hasPitWindow && (!isLastSplit || isSolo || isOnline)) {
-            // [Le code des fenêtres est inchangé, il lit les MS et les convertit bien pour l'affichage via formatTime(pitSec) et Math.ceil()]
             if (isSolo || isOnline) {
                 let isLapMode = document.getElementById('pit-window-mode-tours')?.checked;
                 if (isLapMode) {
@@ -4019,31 +4088,46 @@ function renderStrategy() {
                     let winC = parseInt(document.getElementById('lap-pit-window-close')?.value) || 0;
                     if (winO > 0 || winC > 0) {
                         if (split.stints.length > 1) {
-                            let allValid = true; let invalidCount = 0; let pitDetails = [];
+                            let allValid = true;
+                            let invalidCount = 0;
+                            let pitDetails = [];
                             for (let k = 1; k < split.stints.length; k++) {
                                 let pitLap = split.stints[k - 1].endLap - split.stints[0].startLap;
                                 let isValid = (pitLap >= winO && pitLap <= winC);
                                 if (!isValid) { allValid = false; invalidCount++; }
-                                pitDetails.push(`<span class="${isValid ? "text-success" : "text-danger"} font-weight-bold">T${pitLap}</span>`);
+                                let colorClass = isValid ? "text-success" : "text-danger";
+                                pitDetails.push(`<span class="${colorClass} font-weight-bold">T${pitLap}</span>`);
                             }
-                            windowHTML = `<span>Fenêtre de stand (Tours ${winO} à ${winC}) : <strong class="${allValid ? "text-success" : "text-danger"}">${allValid ? "Dans la fenêtre" : `⚠️ ${invalidCount} arrêt(s) hors fenêtre`}</strong> (Pits: ${pitDetails.join(', ')})</span>`;
-                        } else windowHTML = `<span>Fenêtre de stand (Tours ${winO} à ${winC}) : <strong class="text-warning">Aucun arrêt</strong></span>`;
+                            let statusClass = allValid ? "text-success" : "text-danger";
+                            let statusText = allValid ? "Dans la fenêtre" : `⚠️ ${invalidCount} arrêt${invalidCount > 1 ? 's' : ''} hors fenêtre`;
+                            windowHTML = `<span>Fenêtre de stand (Tours ${winO} à ${winC}) : <strong class="${statusClass}">${statusText}</strong> (Pits: ${pitDetails.join(', ')})</span>`;
+                        } else {
+                            windowHTML = `<span>Fenêtre de stand (Tours ${winO} à ${winC}) : <strong class="text-warning">Aucun arrêt</strong></span>`;
+                        }
                     }
                 } else {
                     let winO = document.getElementById('time-pit-window-open')?.value || "";
                     let winC = document.getElementById('time-pit-window-close')?.value || "";
                     if (winO !== "" && winC !== "") {
-                        let secO = timeStringToSeconds(winO); let secC = timeStringToSeconds(winC); // 🚀 Déjà en MS
+                        let secO = timeStringToSeconds(winO);
+                        let secC = timeStringToSeconds(winC);
                         if (split.stints.length > 1) {
-                            let allValid = true; let invalidCount = 0; let pitDetails = [];
+                            let allValid = true;
+                            let invalidCount = 0;
+                            let pitDetails = [];
                             for (let k = 1; k < split.stints.length; k++) {
-                                let pitSec = split.stints[k - 1].endSec - split.stints[0].startSec;
+                                let pitSec = split.stints[k - 1].endSec - split.stints[0].startSec; // MS
                                 let isValid = (pitSec >= secO && pitSec <= secC);
                                 if (!isValid) { allValid = false; invalidCount++; }
-                                pitDetails.push(`<span class="${isValid ? "text-success" : "text-danger"} font-weight-bold">${formatTime(pitSec)}</span>`);
+                                let colorClass = isValid ? "text-success" : "text-danger";
+                                pitDetails.push(`<span class="${colorClass} font-weight-bold">${formatTime(pitSec)}</span>`);
                             }
-                            windowHTML = `<span>Fenêtre de stand (${winO} à ${winC}) : <strong class="${allValid ? "text-success" : "text-danger"}">${allValid ? "Dans la fenêtre" : `⚠️ ${invalidCount} arrêt(s) hors fenêtre`}</strong> (Pits: ${pitDetails.join(', ')})</span>`;
-                        } else windowHTML = `<span>Fenêtre de stand (${winO} à ${winC}) : <strong class="text-warning">Aucun arrêt</strong></span>`;
+                            let statusClass = allValid ? "text-success" : "text-danger";
+                            let statusText = allValid ? "Dans la fenêtre" : `⚠️ ${invalidCount} arrêt${invalidCount > 1 ? 's' : ''} hors fenêtre`;
+                            windowHTML = `<span>Fenêtre de stand (${winO} à ${winC}) : <strong class="${statusClass}">${statusText}</strong> (Pits: ${pitDetails.join(', ')})</span>`;
+                        } else {
+                            windowHTML = `<span>Fenêtre de stand (${winO} à ${winC}) : <strong class="text-warning">Aucun arrêt effectué</strong></span>`;
+                        }
                     }
                 }
             } else if (splitDurSec > 0) {
@@ -4051,7 +4135,8 @@ function renderStrategy() {
                 let winClose = parseInt(document.getElementById('pit-window-close')?.value) || 0;
                 let regOpenSec = (i + 1) * splitDurSec - (winOpen * 60000); // 🚀 MS
                 let regCloseSec = (i + 1) * splitDurSec + (winClose * 60000); // 🚀 MS
-                let secOpenSec = regOpenSec + 5000; let secCloseSec = regCloseSec - 30000; // 🚀 MS
+                let secOpenSec = regOpenSec + 5000;
+                let secCloseSec = regCloseSec - 30000;
 
                 let lastStint = split.stints[split.stints.length - 1];
                 let avgLapSec = lastStint?.lapSec || 120000; // 🚀 MS
@@ -4064,19 +4149,77 @@ function renderStrategy() {
                 let isSecured = (splitEndSec >= secOpenSec && splitEndSec <= secCloseSec);
                 let isRegulatory = (splitEndSec >= regOpenSec && splitEndSec <= regCloseSec);
 
-                let startIsTarget = split.windowTarget === 'start'; let endIsTarget = split.windowTarget === 'end';
+                let reqTireOnWindow = document.getElementById('pit-tires-only')?.checked;
+                let tireChanged = false;
+                if (i < strategySplits.length - 1) {
+                    let nextTire = strategySplits[i + 1].stints[0].tire;
+                    let currentTire = split.stints[split.stints.length - 1].tire;
+                    if (nextTire !== currentTire) tireChanged = true;
+                }
+
+                let startIsTarget = split.windowTarget === 'start';
+                let endIsTarget = split.windowTarget === 'end';
+                let targetSet = (startIsTarget || endIsTarget);
+
                 let startLabelClass = (startIsTarget && split.targetFailed) ? 'text-danger font-weight-bold' : (endIsTarget ? 'text-grey font-weight-bold' : 'font-weight-bold');
                 let endLabelClass = (endIsTarget && split.targetFailed) ? 'text-danger font-weight-bold' : (startIsTarget ? 'text-grey font-weight-bold' : 'font-weight-bold');
-                let cbStart = `<label class="inline-checkbox-label m-0 ${startLabelClass}">${endIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'start' : null)" ${startIsTarget ? 'checked' : ''}>`} Tour ${minLap}</label>`;
-                let cbEnd = `<label class="inline-checkbox-label m-0 ${endLabelClass}">${startIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'end' : null)" ${endIsTarget ? 'checked' : ''}>`} Tour ${maxLap}</label>`;
-                let statusHTML = (startIsTarget || endIsTarget) ? (isSecured ? `🟢 <strong>Cible atteinte</strong>` : (isRegulatory ? `🟠 <strong>Cible sans sécurité</strong>` : `🔴 <strong>Non respecté</strong>`)) : (isSecured ? `🟢 <strong>Respecté</strong>` : `🔴 <strong>Hors fenêtre</strong>`);
-                windowHTML = `<span class="flex-inline-center"><span class="mr-5 unite">${!isRelayEnd ? "Fenêtre de stand" : "Changement pilote"}<span class="unite"> :</span></span> ${cbStart} <span class="mx-5 ${startIsTarget || endIsTarget ? 'text-grey' : ''}">➔</span> ${cbEnd} &nbsp;&nbsp;|&nbsp;&nbsp; ${statusHTML}</span>`;
+
+                let cbStartInput = endIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'start' : null)" ${startIsTarget ? 'checked' : ''}>`;
+                let cbEndInput = startIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'end' : null)" ${endIsTarget ? 'checked' : ''}>`;
+
+                let cbStart = `<label class="inline-checkbox-label m-0 ${startLabelClass}">${cbStartInput} Tour ${minLap}</label>`;
+                let cbEnd = `<label class="inline-checkbox-label m-0 ${endLabelClass}">${cbEndInput} Tour ${maxLap}</label>`;
+
+                let arrowClass = (startIsTarget || endIsTarget) ? 'text-grey' : '';
+                let arrowHTML = `<span class="mx-5 ${arrowClass}">➔</span>`;
+
+                let prefix = !isRelayEnd ? "Fenêtre de stand" : "Changement pilote";
+                let respectWord = !isRelayEnd ? "Respectée" : "Respecté";
+                let nonRespectWord = !isRelayEnd ? "Non respectée" : "Non respecté";
+                let statusHTML = "";
+
+                if (split.windowTarget === 'start' || split.windowTarget === 'end') {
+                    let cibleText = split.windowTarget === 'start' ? 'début' : 'fin';
+                    if (isSecured) {
+                        statusHTML = `🟢 <strong>Cible ${cibleText} de fenêtre</strong>`;
+                    } else if (isRegulatory) {
+                        statusHTML = `🟠 <strong>Cible ${cibleText} (hors sécurité)</strong>`;
+                    } else {
+                        statusHTML = `🔴 <strong>${nonRespectWord}</strong>`;
+                    }
+                } else if (!isRelayEnd) {
+                    if (isSecured) {
+                        statusHTML = `🟢 <strong>${respectWord}</strong>`;
+                    } else if (isRegulatory) {
+                        statusHTML = `🟠 <strong>${respectWord} sans sécurité</strong>`;
+                    } else {
+                        if (reqTireOnWindow && tireChanged) {
+                            statusHTML = `🔴 <strong>${nonRespectWord}</strong>`;
+                        } else {
+                            statusHTML = `🟠 <strong>Hors fenêtre par choix</strong>`;
+                        }
+                    }
+                } else {
+                    if (isSecured) {
+                        statusHTML = `🟢 <strong>${respectWord}</strong>`;
+                    } else if (isRegulatory) {
+                        statusHTML = `🟠 <strong>${respectWord} sans sécurité</strong>`;
+                    } else {
+                        statusHTML = `🔴 <strong>${nonRespectWord}</strong>`;
+                    }
+                }
+
+                windowHTML = `<span class="flex-inline-center"><span class="mr-5 unite">${prefix}<span class="unite"> :</span></span> ${cbStart} ${arrowHTML} ${cbEnd} &nbsp;&nbsp;|&nbsp;&nbsp; ${statusHTML}</span>`;
             }
         }
 
         let footerHTML = "";
-        if (windowHTML !== "") footerHTML += windowHTML;
-        if (goalHTML !== "") footerHTML += footerHTML ? `<br>${goalHTML}` : goalHTML;
+        if (windowHTML !== "") {
+            footerHTML += windowHTML;
+        }
+        if (goalHTML !== "") {
+            footerHTML += footerHTML ? `<br>${goalHTML}` : goalHTML;
+        }
 
         let isSplitActive = lastActiveStint && lastActiveStint.startsWith(`${i}-`);
         let blockHTML = `
@@ -4093,39 +4236,94 @@ function renderStrategy() {
                 </div>
             </div>
             <table class="stint-table">
-                <thead><tr><th class="zone-pit">Pneus</th><th class="zone-pit">Fuel</th><th class="zone-pit zone-border">PIT</th><th class="zone-config">Gomme</th><th class="zone-config">Strat</th><th class="zone-config zone-border">Tours</th><th class="zone-end">Action</th><th class="zone-end">FIN DE STINT</th><th class="delete-cell"></th></tr></thead>
-                <tbody>${tableRowsHTML}</tbody>
+                <thead>
+                    <tr>
+                        <th class="zone-pit">Pneus</th>
+                        <th class="zone-pit">Fuel</th>
+                        <th class="zone-pit zone-border">PIT</th>
+                        <th class="zone-config">Gomme</th>
+                        <th class="zone-config">Strat</th>
+                        <th class="zone-config zone-border">Tours</th>
+                        <th class="zone-end">Action</th>
+                        <th class="zone-end">FIN DE STINT</th>
+                        <th class="delete-cell"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRowsHTML}
+                </tbody>
             </table>
-            <div class="split-footer"><div class="pit-window-info">${footerHTML}</div><button class="action-btn fs-08" onclick="addStintRow(${i})">+ Ajouter un Stint</button></div>
+            <div class="split-footer">
+                <div class="pit-window-info">${footerHTML}</div>
+                <button class="action-btn fs-08" onclick="addStintRow(${i})">+ Ajouter un Stint</button>
+            </div>
             ${isLastSplit ? `<div class="checkered-flag"></div>` : ''}
         </div>`;
+
         container.insertAdjacentHTML('beforeend', blockHTML);
     }
 
-    // Le code de fin pour les alertes (inchangé, sauf le if isGlobalObjectiveMet)
     if (isOnline && goal === 'laps' && !isSolo) {
         let valBlock = document.getElementById('global-team-validation');
         let valText = document.getElementById('global-team-text');
         valBlock.classList.remove('hidden');
+
         let targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
+
         if (grandTotalLaps >= targetLaps) {
-            valBlock.className = "global-team-validation border-success";
+            valBlock.classList.remove('border-danger');
+            valBlock.classList.add('border-success');
             valText.innerHTML = `🏁 Objectif d'équipe atteint : ${grandTotalLaps} / ${targetLaps} tours.`;
             valText.className = "validation-text text-success";
         } else {
-            valBlock.className = "global-team-validation border-danger";
+            valBlock.classList.remove('border-success');
+            valBlock.classList.add('border-danger');
             valText.innerHTML = `⚠️ Objectif d'équipe non atteint : Manque ${targetLaps - grandTotalLaps} tours !`;
             valText.className = "validation-text text-danger";
         }
-    } else document.getElementById('global-team-validation').classList.add('hidden');
+    } else {
+        document.getElementById('global-team-validation').classList.add('hidden');
+    }
 
+    // 🚀 GESTION DES BOUTONS DE RESET (RESTAURÉE !)
+    let btnClear = document.getElementById('btn-clear-strategy');
+    let btnRestart = document.getElementById('btn-restart-race');
+    let hasLockedStints = strategySplits.some(split => split.stints.some(stint => stint.isPitted));
+
+    if (liveTimerActive) {
+        if (btnClear) btnClear.classList.add('hidden');
+        if (btnRestart) btnRestart.classList.add('hidden');
+    } else {
+        if (btnClear) btnClear.classList.remove('hidden');
+        if (btnRestart) btnRestart.classList.toggle('hidden', !hasLockedStints);
+    }
+
+    // 1. On lance le check des règles classiques
     checkGlobalRules();
+
+    // 2. On fusionne l'erreur d'objectif avec l'alerte globale
     if (!isGlobalObjectiveMet) {
         window.hasGlobalAlert = true;
         let objError = "L'objectif final (temps / tours) n'est pas atteint.";
         window.globalAlertText = window.globalAlertText ? window.globalAlertText + " | " + objError : objError;
     }
+
+    // 3. On met à jour l'interface visuelle
     updateAlertVisibility();
+
+    if (strTimer && JSON.parse(strTimer).active && liveTimerActive) {
+        timerTick();
+    }
+
+    if (window.pendingExcessData) {
+        openExcessModal();
+    }
+
+    let localSaveInput = document.getElementById('local-save-name');
+    if (localSaveInput) {
+        let raceNameInput = document.getElementById('race-name-input');
+        localSaveInput.value = (currentRaceId && raceNameInput) ? raceNameInput.value : "";
+    }
 }
 
 function checkExportSecurity() {

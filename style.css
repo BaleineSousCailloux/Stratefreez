@@ -819,6 +819,7 @@ input[type="number"]::-webkit-outer-spin-button {
    ============================================================ */
 .active-live-stint td {
     background-color: rgba(37, 253, 233, 0.1) !important;
+    box-shadow: none !important;
 }
 
 .active-live-stint {
@@ -830,15 +831,15 @@ input[type="number"]::-webkit-outer-spin-button {
 /* Moteur A : Juste la couleur de fond (pour toute la ligne) */
 @keyframes pulse-and-bar-turquoise {
     0% {
-        box-shadow: inset -2px 0 0 #25fde9, inset 0 0 8px rgba(37, 253, 233, 0.15);
+        box-shadow: inset -3px 0 0 #25fde9, inset 0 0 8px rgba(37, 253, 233, 0.15);
     }
 
     50% {
-        box-shadow: inset -30px 0 0 #25fde9, inset 0 0 20px rgba(37, 253, 233, 0.60);
+        box-shadow: inset -40px 0 0 #25fde9, inset 0 0 20px rgba(37, 253, 233, 0.6);
     }
 
     100% {
-        box-shadow: inset -2px 0 0 #25fde9, inset 0 0 8px rgba(37, 253, 233, 0.15);
+        box-shadow: inset -3px 0 0 #25fde9, inset 0 0 8px rgba(37, 253, 233, 0.15);
     }
 }
 
@@ -854,26 +855,6 @@ input[type="number"]::-webkit-outer-spin-button {
     }
 
     100% {
-        box-shadow: inset 0 3px 8px rgba(37, 253, 233, 0.15);
-        box-shadow: inset 0 -3px 8px rgba(37, 253, 233, 0.15);
-    }
-}
-
-@keyframes pulse-and-bar-turquoise-child {
-    0% {
-        box-shadow: inset -2px 0 0 #25fde9;
-        box-shadow: inset 0 3px 8px rgba(37, 253, 233, 0.15);
-        box-shadow: inset 0 -3px 8px rgba(37, 253, 233, 0.15);
-    }
-
-    50% {
-        box-shadow: inset -20px 0 0 #25fde9;
-        box-shadow: inset 0 12px 20px rgba(37, 253, 233, 0.6);
-        box-shadow: inset 0 -12px 20px rgba(37, 253, 233, 0.6);
-    }
-
-    100% {
-        box-shadow: inset -2px 0 0 #25fde9;
         box-shadow: inset 0 3px 8px rgba(37, 253, 233, 0.15);
         box-shadow: inset 0 -3px 8px rgba(37, 253, 233, 0.15);
     }
@@ -2111,15 +2092,46 @@ svg.live-grey-icon {
     }
 
     .active-live-stint td {
-        animation: only-pulse-turquoise 2s infinite !important;
+        /*animation: only-pulse-turquoise 2s infinite !important;*/
+        position: relative !important;
     }
-
-        .active-live-stint td:nth-child(9) {
-            animation: pulse-and-bar-turquoise-child 2s infinite !important;
-        }
 
     .active-live-stint {
         animation: none !important;
+    }
+
+        /* 2. Création des barres physiques (Haut et Bas) */
+        .active-live-stint td::before,
+        .active-live-stint td::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0; /* Étend la barre sur toute la largeur de la cellule */
+            background-color: transparent;
+            animation: pulse-lines 2s infinite !important;
+            z-index: 10;
+            pointer-events: none; /* Empêche les barres de bloquer les clics */
+        }
+
+        .active-live-stint td::before {
+            top: 0;
+        }
+
+        .active-live-stint td::after {
+            bottom: 0;
+        }
+
+    /* 3. L'animation de l'épaisseur et du halo des barres */
+    @keyframes pulse-lines {
+        0%, 100% {
+            height: 2px;
+            box-shadow: 0 0 5px rgba(37, 253, 233, 0.15);
+        }
+
+        50% {
+            height: 10px; /* La barre s'épaissit vers l'intérieur */
+            box-shadow: 0 0 15px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
+        }
     }
 }
 

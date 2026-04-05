@@ -738,6 +738,8 @@ function handlePadlockClick() {
             setTimeout(() => document.getElementById('pin-auth-input').focus(), 50);
         }
     }
+    // 🚀 AJOUT : On force la mise à jour de l'écran Start du Live
+    updateLiveStandbyState();
 }
 
 function closePinAuthModal() { document.getElementById('pin-auth-modal').classList.add('hidden'); }
@@ -770,7 +772,7 @@ window.addEventListener('online', () => {
 document.addEventListener('DOMContentLoaded', () => {
     calibrateTime(); // 🚀 ON CALIBRE L'HORLOGE DÈS L'OUVERTURE
     bindGlobalSyncEvents();
-
+    applyMobileNumericKeypad(); // 🚀 APPLICATION DU CLAVIER DÉCIMAL MOBILE
     let timerStr = localStorage.getItem('stratefreez-timer');
     let isTimerRunning = timerStr ? JSON.parse(timerStr).active : false;
 
@@ -1560,6 +1562,7 @@ function updateTechDrivers(numDrivers) {
     }
     while (container.children.length > numDrivers) { container.lastElementChild.remove(); }
     applyFormatters();
+    applyMobileNumericKeypad(); // 🚀 MET À JOUR LES NOUVEAUX CHAMPS PILOTES
 }
 
 function generateDriverCardHTML(index, name) {
@@ -1592,6 +1595,8 @@ function toggleTireOptions(id) {
         });
     }
     syncTiresVisibility();
+    // 🚀 NOUVEAU : Application du clavier sur les champs de règlement pneus fraîchement dévoilés
+    applyMobileNumericKeypad();
 }
 
 // 🚀 SÉCURITÉ ABSOLUE : On vérifie si l'élément parent existe pour ne pas faire crasher le script
@@ -4175,10 +4180,10 @@ function renderStrategy() {
             let manualFuelClass = stint.manualFuel !== null ? 'manual-override-text' : '';
             let fuelCellHTML = isAbsoluteFirst ? `<span class="px-5 py-2">${initialFuel.toFixed(1)}<span class="unite"> L</span></span>` : (isHistorical ? `<span class="inline-block px-5 py-2">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>` : `<span class="inline-block cursor-pointer px-5 py-2 border-radius-4 ${manualFuelClass}" onclick="openFuelModal(${i}, ${j}, ${stint.cachedTargetFuel})">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>`);
 
-            // 🚀 ERGONOMIE MOBILE : Appelle le pavé numérique et supprime l'ancien cadenas
+            // 🚀 ERGONOMIE MOBILE : Appelle le pavé numérique décimal
             let lapsInputHTML = (isLockedStint || isHistorical) ?
-                `<input type="number" inputmode="numeric" pattern="[0-9]*" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` :
-                `<input type="number" inputmode="numeric" pattern="[0-9]*" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
+                `<input type="number" inputmode="decimal" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` :
+                `<input type="number" inputmode="decimal" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
 
             // 🚀 CALCUL DU TOUT DERNIER STINT POUR LE DRAPEAU
             let isUltimateStint = false;
@@ -4194,7 +4199,7 @@ function renderStrategy() {
                 // mais le CSS masque le texte et peint le damier.
                 actionBtnHTML = `<button class="action-btn pit-btn finish-line-placeholder" title="Ligne d'arrivée">PIT<span class="hide-on-mobile"> IN</span></button>`;
             } else {
-                actionBtnHTML = isHistorical ? `<button class="action-btn btn-invisible" onclick="openUndoPitModal(${i}, ${j}, ${stint.laps})" title="Annuler le PIT IN">✅ Fait</button>` : `<button class="action-btn magic-btn pit-btn" onclick="openPitModal(${i}, ${j}, ${stint.startLap}, ${stint.endLap})">PIT<span class="hide-on-mobile"> IN</span></button>`;
+                actionBtnHTML = isHistorical ? `<button class="action-btn btn-invisible" onclick="openUndoPitModal(${i}, ${j}, ${stint.laps})" title="Annuler le PIT IN">✅</button>` : `<button class="action-btn magic-btn pit-btn" onclick="openPitModal(${i}, ${j}, ${stint.startLap}, ${stint.endLap})">PIT<span class="hide-on-mobile"> IN</span></button>`;
             }
 
             let timeClass = isFinalStintOfBlock ? "last-stint-highlight" : "time-cell";
@@ -5217,4 +5222,15 @@ function handleLocalFileSelect(event) {
     };
     reader.readAsText(file);
     event.target.value = "";
+}
+
+// 🚀 FORCE LE CLAVIER DÉCIMAL UNIVERSEL SUR TOUS LES NOMBRES
+function applyMobileNumericKeypad() {
+    document.querySelectorAll('input[type="number"]').forEach(input => {
+        input.setAttribute('inputmode', 'decimal');
+        // Nettoie les anciens patterns si jamais il en reste
+        if (input.hasAttribute('pattern')) {
+            input.removeAttribute('pattern');
+        }
+    });
 }

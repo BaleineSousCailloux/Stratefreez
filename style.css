@@ -854,19 +854,24 @@ input[type="number"]:disabled {
     background-color: #222 !important;
     border: 1px solid #444 !important;
     color: #ccc !important;
-    cursor: not-allowed;
+    cursor: not-allowed !important;
     opacity: 1;
     width: 100% !important;
 }
 
-/* 🚀 NOUVEAU STYLE : Case de tours verrouillée (Remplace l'ancien cadenas) */
+/* 🚀 STYLE : Case de tours verrouillée (Dernier stint / Relais online) */
 input.table-input:disabled {
-    background-color: #222 !important;
     border: 2px solid #cc2d53 !important; /* Bordure rouge vif */
-    color: #ff5252 !important; /*Chiffre rouge pour l'alerte */
-    opacity: 1 !important; /* Pleine lisibilité garantie */
+    color: #ff5252 !important; /* Chiffre rouge pour l'alerte */
     font-weight: bold;
 }
+
+    /* Bloc spécifique pour cacher les flèches sur Chrome/Edge/Safari (PC) */
+    input.table-input:disabled::-webkit-inner-spin-button,
+    input.table-input:disabled::-webkit-outer-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+    }
 
 /* Fuel Cell (Tableau) */
 .fuel-cell {
@@ -1318,10 +1323,13 @@ select:disabled, input:disabled, .locked-sim {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 60vh;
+    min-height: 100vh;
+    min-width: 100vw;
 }
 
 #btn-giant-start {
+    width: 60vw;
+    height: 60vh;
     font-size: 2em;
     padding: 20px 40px;
     border-radius: 8px;
@@ -2039,7 +2047,7 @@ svg.live-grey-icon {
 /* Style commun aux deux alertes d'orientation */
 .portrait-overlay, .landscape-overlay {
     display: none;
-    background-color: #000;
+    background-color: #1e1e1e;
     color: #82b1ff;
     font-weight: bold;
     font-size: 1.8em;
@@ -2047,11 +2055,21 @@ svg.live-grey-icon {
     align-items: center;
     justify-content: center;
     padding: 20px;
-    border-radius: 8px;
     height: calc(100vh - 100px);
-    border: 2px solid #82b1ff;
-    box-shadow: 0 0 20px rgba(130, 177, 255, 0.2);
+    width: 100vw;
+    border: none !important;
     margin: 0;
+    animation: pulse-text 2s infinite;
+}
+
+@keyframes pulse-text {
+    0%, 100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
 }
 
 /* ============================================================

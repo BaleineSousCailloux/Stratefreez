@@ -2050,7 +2050,7 @@ svg.live-grey-icon {
 /* Style commun aux deux alertes d'orientation */
 #portrait-overlay, #landscape-overlay {
     display: none;
-    z-index: 10000;
+    z-index: 60;
     position: fixed; /* 🚀 Indispensable pour supprimer le scroll */
     top: 0;
     left: 0;
@@ -2196,10 +2196,18 @@ svg.live-grey-icon {
     #live-dashboard:not(.hidden) {
         display: none !important;
     }
-        /* 2. On affiche l'alerte SEULEMENT si le dashboard n'est pas caché par le JS */
-        #live-dashboard:not(.hidden) ~ .landscape-overlay {
-            display: flex !important;
-        }
+    /* 2. On affiche l'alerte*/
+    #tab-live > div:not(#landscape-overlay) {
+        display: none !important;
+    }
+
+    .landscape-overlay {
+        display: flex !important;
+    }
+    /* 🚀 NOUVEAU : Masque le bouton retour en haut si l'onglet 3 est actif */
+    body:has(#tab-live:not(.hidden)) #fab-top {
+        display: none !important;
+    }
 }
 
 /* --- Tablette Moyenne (Max 1000px) --- */

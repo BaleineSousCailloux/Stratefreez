@@ -3596,9 +3596,47 @@ function checkGlobalRules() {
     let totalSecRace = getRaceDurationSeconds(); // 🚀 MS
     let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0; // 🚀 MS
 
-    let bilanHTML = "<ul class='list-unstyled'>";
-    let tireFails = { T: [], M: [], D: [], I: [], P: [] };
+    let goal = document.getElementById('race-goal')?.value;
+    let targetLapsRace = parseInt(document.getElementById('race-laps')?.value) || 0;
+    let isGlobalObjectiveMet = true;
 
+    // 🚀 1. VÉRIFICATION DE L'OBJECTIF GLOBAL
+    for (let i = 0; i < strategySplits.length; i++) {
+        let split = strategySplits[i];
+        let isLastSplit = (i === strategySplits.length - 1);
+        let splitEndSec = split.stints[split.stints.length - 1].endSec || 0;
+        let splitLaps = (split.stints[split.stints.length - 1].endLap || 0) - (split.stints[0].startLap || 0);
+
+        if (isOnline || isSolo) {
+            if (goal === 'time') {
+                if (splitEndSec < splitDurSec - 10) isGlobalObjectiveMet = false;
+            } else {
+                let targetPerRelay = Math.floor(targetLapsRace / splitsCount);
+                if (isLastSplit) targetPerRelay = targetLapsRace - (i * targetPerRelay);
+                if (splitLaps < targetPerRelay) isGlobalObjectiveMet = false;
+            }
+        } else {
+            if (isLastSplit) {
+                if (goal === 'time') {
+                    if (splitEndSec < totalSecRace - 10) isGlobalObjectiveMet = false;
+                } else {
+                    if (split.stints[split.stints.length - 1].endLap < targetLapsRace) isGlobalObjectiveMet = false;
+                }
+            }
+        }
+    }
+
+    let bilanHTML = "<ul class='list-unstyled'>";
+
+    // 🚀 INJECTION DANS LA MODALE
+    if (!isGlobalObjectiveMet) {
+        rulesErrors.push("L'objectif final (temps/tours) n'est pas couvert par la stratégie");
+        bilanHTML += `<li class="mb-10 pb-10 border-bottom-dashed"><strong class="text-danger">⚠️ Objectif global non atteint</strong><br><span class="fs-09 text-grey-dark">La stratégie actuelle ne couvre pas la cible définie (Voir blocs ci-dessous).</span></li>`;
+    } else {
+        bilanHTML += `<li class="mb-10 pb-10 border-bottom-dashed"><strong class="text-success">🏁 Objectif global sécurisé</strong></li>`;
+    }
+
+    let tireFails = { T: [], M: [], D: [], I: [], P: [] };
     let lastTireUsed = null;
 
     function isPitInWindow(pitSec, pitLap, relayStartSec, relayStartLap) {
@@ -3614,7 +3652,6 @@ function checkGlobalRules() {
                 return (relativeSec >= winO_time && relativeSec <= winC_time);
             }
         } else {
-            // 🚀 CORRECTION : winOpenSec est en MS, donc minutes * 60000
             let winOpenSec = winOpen * 60000;
             let winCloseSec = winClose * 60000;
             for (let k = 0; k < splitsCount; k++) {
@@ -3705,7 +3742,6 @@ function checkGlobalRules() {
             let endSec = split.stints[split.stints.length - 1].endSec;
 
             if (splitDurSec > 0) {
-                // 🚀 CORRECTION : winOpenSec est en MS, donc minutes * 60000
                 let winOpenSec = winOpen * 60000;
                 let winCloseSec = winClose * 60000;
 
@@ -4285,7 +4321,7 @@ function renderStrategy() {
         document.getElementById('global-team-validation').classList.add('hidden');
     }
 
-    // 🚀 GESTION DES BOUTONS DE RESET (RESTAURÉE !)
+    // 🚀 GESTION DES BOUTONS DE RESET
     let btnClear = document.getElementById('btn-clear-strategy');
     let btnRestart = document.getElementById('btn-restart-race');
     let hasLockedStints = strategySplits.some(split => split.stints.some(stint => stint.isPitted));
@@ -4298,17 +4334,10 @@ function renderStrategy() {
         if (btnRestart) btnRestart.classList.toggle('hidden', !hasLockedStints);
     }
 
-    // 1. On lance le check des règles classiques
+    // 1. On lance le check global (Règles + Objectif de course combinés)
     checkGlobalRules();
 
-    // 2. On fusionne l'erreur d'objectif avec l'alerte globale
-    if (!isGlobalObjectiveMet) {
-        window.hasGlobalAlert = true;
-        let objError = "L'objectif final (temps / tours) n'est pas atteint.";
-        window.globalAlertText = window.globalAlertText ? window.globalAlertText + " | " + objError : objError;
-    }
-
-    // 3. On met à jour l'interface visuelle
+    // 2. On met à jour l'interface visuelle (Fond rouge, cadenas d'export)
     updateAlertVisibility();
 
     if (strTimer && JSON.parse(strTimer).active && liveTimerActive) {

@@ -857,6 +857,10 @@ function showErrorModal(msg) {
 }
 
 function clearCurrentRaceData() {
+    // 🚀 ÉTAPE 0 : ON COUPE LE BOUCLIER INGÉNIEUR (Master Lock)
+    // Cela empêche toute sauvegarde Cloud accidentelle pendant le nettoyage.
+    isEngineerMode = false;
+    toggleObserverMode(true);
     // 🚀 ÉTAPE 1 : ON DÉTRUIT LE CHRONO LOCAL EN SILENCE AVANT TOUT
     if (typeof purgeLocalState === 'function') purgeLocalState();
     currentRaceId = null;
@@ -1148,7 +1152,23 @@ function listenToCloudRace() {
             // 1. SÉCURITÉ DE SAISIE (Empêche le clavier de se fermer)
             let activeEl = document.activeElement;
             let isTyping = activeEl && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName);
+            // 4. SYNCHRO DU CHRONO 🚀
+            let localTimerStr = localStorage.getItem('stratefreez-timer');
+            let localTimer = localTimerStr ? JSON.parse(localTimerStr) : null;
 
+            if (data.timerState && data.timerState.active) {
+                // Le cloud demande au chrono de tourner
+                if (!localTimer || !localTimer.active || localTimer.startTimeReal !== data.timerState.startTimeReal) {
+                    localStorage.setItem('stratefreez-timer', JSON.stringify(data.timerState));
+                    loadTimerState(); // Relance la boucle de chrono visuel locale
+                }
+            } else {
+                // Le cloud dit que le chrono est arrêté
+                if (localTimer && localTimer.active) {
+                    // 🚀 ARRÊT SILENCIEUX (Empêche la boucle infinie avec Firebase)
+                    stopTimer(false, true);
+                }
+            }
             // 2. MISE À JOUR STRATÉGIE (Seulement si on ne tape pas)
             if (data.strategyData && !isTyping) {
                 strategySplits = data.strategyData;
@@ -1166,24 +1186,6 @@ function listenToCloudRace() {
             // 3. MISE À JOUR FORMULAIRES (Seulement si on ne tape pas)
             if (data.formState && !isTyping) {
                 applyFormStateToDOM(data.formState);
-            }
-
-            // 4. SYNCHRO DU CHRONO 🚀
-            let localTimerStr = localStorage.getItem('stratefreez-timer');
-            let localTimer = localTimerStr ? JSON.parse(localTimerStr) : null;
-
-            if (data.timerState && data.timerState.active) {
-                // Le cloud demande au chrono de tourner
-                if (!localTimer || !localTimer.active || localTimer.startTimeReal !== data.timerState.startTimeReal) {
-                    localStorage.setItem('stratefreez-timer', JSON.stringify(data.timerState));
-                    loadTimerState(); // Relance la boucle de chrono visuel locale
-                }
-            } else {
-                // Le cloud dit que le chrono est arrêté
-                if (localTimer && localTimer.active) {
-                    // 🚀 ARRÊT SILENCIEUX (Empêche la boucle infinie avec Firebase)
-                    stopTimer(false, true);
-                }
             }
         } else {
             // 🚀 NOUVEAU : DÉTECTEUR DE COURSE FANTÔME
@@ -1462,7 +1464,6 @@ function autoFillStartTimes() {
         let el = document.getElementById(`start-time-${i + 1}`);
         if (el) { el.value = `${h}:${m}`; el.dataset.formatted = "true"; }
     }
-    saveFormState();
     renderStrategy();
 }
 

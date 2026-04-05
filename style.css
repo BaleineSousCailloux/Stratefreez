@@ -1077,8 +1077,10 @@ select:disabled, input:disabled, .locked-sim {
     left: 0;
     right: 0;
     bottom: 0;
+    background-color: #1e1e1e;
     text-align: center;
-    margin-top: 35px;
+    margin-top: 0px;
+    padding: 15px;
 }
 
 .icon-huge-grey {

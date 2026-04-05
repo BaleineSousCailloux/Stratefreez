@@ -5,11 +5,6 @@
     font-family: 'Roboto', sans-serif;
 }
 
-:root {
-    /* 🚀 Empêche les navigateurs mobiles de tenter d'assombrir vos belles couleurs claires (rose/vert) */
-    color-scheme: dark;
-}
-
 body {
     background-color: #1e1e1e;
     color: #f5f5f5;
@@ -986,11 +981,12 @@ input.table-input:disabled {
 /* Inputs & Boutons Tableau */
 /* 🚀 NOUVEAU : On supprime la flèche des sélecteurs partout (PC et Mobile) pour un centrage parfait */
 .table-select, .header-driver, .header-spotter {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: none !important;
     text-align-last: center;
-    background-image: none !important; /* TUE le dégradé natif du mode sombre mobile */
+    border: 1px solid transparent; /* 🚀 Force Safari à abandonner son bouton natif */
 }
 
 .table-select {
@@ -1947,53 +1943,54 @@ select:disabled, input:disabled, .locked-sim {
 }
 
 /* Pastilles & Icones */
+/* 🚀 FIX IOS ABSOLU : Force la couleur de fond ET la couleur du texte contre le Dark Mode natif */
 .bg-tire-T {
     background: #ff5252 !important;
     color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
     font-weight: bold;
-    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-tire-M {
     background: #ffeb3b !important;
     color: #000 !important;
+    -webkit-text-fill-color: #000 !important;
     font-weight: bold;
-    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-tire-D {
     background: #e0e0e0 !important;
     color: #000 !important;
+    -webkit-text-fill-color: #000 !important;
     font-weight: bold;
-    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-tire-I {
     background: #4caf50 !important;
     color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
     font-weight: bold;
-    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-tire-P {
     background: #2196f3 !important;
     color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
     font-weight: bold;
-    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-fuel-eco {
     background: #c8e6c9 !important;
     color: #1b5e20 !important;
+    -webkit-text-fill-color: #1b5e20 !important;
     font-weight: bold;
-    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .bg-fuel-push {
     background: #f8bbd0 !important;
     color: #880e4f !important;
+    -webkit-text-fill-color: #880e4f !important;
     font-weight: bold;
-    background-image: none !important; /* Sécurité absolue contre WebKit */
 }
 
 .live-fuel-pill {

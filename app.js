@@ -857,6 +857,8 @@ function showErrorModal(msg) {
 }
 
 function clearCurrentRaceData() {
+    // 🚀 ÉTAPE 1 : ON DÉTRUIT LE CHRONO LOCAL EN SILENCE AVANT TOUT
+    if (typeof purgeLocalState === 'function') purgeLocalState();
     currentRaceId = null;
     currentRacePin = null;
     isRaceActive = false;
@@ -1179,19 +1181,8 @@ function listenToCloudRace() {
             } else {
                 // Le cloud dit que le chrono est arrêté
                 if (localTimer && localTimer.active) {
-                    // Arrêt purement local (sans renvoyer de requête au cloud)
-                    liveTimerActive = false;
-                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-                    localStorage.removeItem('stratefreez-timer');
-
-                    let navTitle = document.getElementById('nav-brand-text');
-                    if (navTitle) {
-                        navTitle.innerText = "STRATEFREEZ";
-                        navTitle.classList.remove('chrono-active');
-                    }
-                    document.querySelectorAll('.active-live-stint').forEach(el => el.classList.remove('active-live-stint'));
-                    renderStrategy();
-                    updateLiveSpotter(0, null);
+                    // 🚀 ARRÊT SILENCIEUX (Empêche la boucle infinie avec Firebase)
+                    stopTimer(false, true);
                 }
             }
         } else {
@@ -2129,7 +2120,7 @@ function confirmStopTimer() {
     stopTimer(false);
 }
 
-function stopTimer(isRaceEnd) {
+function stopTimer(isRaceEnd, isSilent = false) {
     liveTimerActive = false;
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
@@ -2142,13 +2133,18 @@ function stopTimer(isRaceEnd) {
     }
     document.querySelectorAll('.active-live-stint').forEach(el => el.classList.remove('active-live-stint'));
 
-    // 🚀 GESTION DU CLOUD (On prévient que le chrono s'arrête, MAIS le câble local reste branché)
-    if (isRaceEnd) {
-        // ON NE TUE PLUS LA COURSE LOCALEMENT (isRaceActive reste true !)
+    // 🚀 LE SILENCE RADIO : Si c'est un arrêt purement local de nettoyage, on s'arrête ici.
+    if (isSilent) {
+        renderStrategy();
+        updateLiveSpotter(0, null);
+        return; // ⛔ Bloque la descente vers Firebase !
+    }
 
+    // 🚀 GESTION DU CLOUD (Arrêt volontaire par l'ingénieur via un bouton)
+    if (isRaceEnd) {
         if (currentRaceId) {
             db.collection('races').doc(currentRaceId).update({
-                isActive: false, // Flag serveur pour basculer dans le dossier "🏁 Terminées"
+                isActive: false,
                 isTimerRunning: false,
                 timerState: null
             }).catch(e => console.error(e));
@@ -2160,7 +2156,6 @@ function stopTimer(isRaceEnd) {
             setTimeout(() => { banner.classList.add('hidden'); }, 10000);
         }
     } else {
-        // Arrêt manuel en cours de course
         if (currentRaceId && isRaceActive) {
             db.collection('races').doc(currentRaceId).update({
                 isTimerRunning: false,
@@ -2171,7 +2166,7 @@ function stopTimer(isRaceEnd) {
 
     renderStrategy();
     updateLiveSpotter(0, null);
-    updateLiveStandbyState(true); // Lance le compte à rebours de 5 minutes
+    updateLiveStandbyState(true);
 }
 
 function loadTimerState() {
@@ -4876,22 +4871,12 @@ function restoreSnapshot(idx) {
 // ==========================================
 // --- SAS DE DÉCONTAMINATION LOCALE ---
 // ==========================================
+// ==========================================
+// --- SAS DE DÉCONTAMINATION LOCALE ---
+// ==========================================
 function purgeLocalState() {
-    // 1. Tuer le moteur du chrono visuel
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
-
-    // 2. Vider la mémoire de l'appareil
-    liveTimerActive = false;
-
-    // 3. Nettoyer l'interface visuelle (Arrêter le clignotement)
-    let navBrandText = document.getElementById('nav-brand-text');
-    if (navBrandText) {
-        navBrandText.classList.remove('chrono-active');
-        navBrandText.innerText = "STRATEFREEZ";
-    }
+    // 🚀 L'ASSASSINAT LOCAL : On tue le chrono en silence absolu
+    stopTimer(false, true);
 }
 
 // ==========================================

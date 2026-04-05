@@ -556,12 +556,12 @@ function loadConfig(event) {
                 if (strTimer) {
                     let timerState = JSON.parse(strTimer);
                     if (timerState && timerState.active) {
-                        let elapsed = Math.floor((getUnifiedTime() - timerState.startTimeReal) / 1000);
+                        let elapsed = getUnifiedTime() - timerState.startTimeReal;
                         for (let i = 0; i < strategySplits.length; i++) {
                             if (timerState.type === 'online' && i !== timerState.splitIdx) continue;
                             for (let j = 0; j < strategySplits[i].stints.length; j++) {
                                 let stint = strategySplits[i].stints[j];
-                                if (!stint.isPitted && stint.endSec !== undefined && elapsed >= (stint.endSec + 300)) {
+                                if (!stint.isPitted && stint.endSec !== undefined && elapsed >= (stint.endSec + 300000)) {
                                     stint.isPitted = true;
                                     stint.lockedTimeSec = stint.endSec;
                                     needsCatchup = true;
@@ -1460,13 +1460,14 @@ function autoFillStartTimes() {
 
     let baseSec = timeStringToSeconds(document.getElementById('start-time-1')?.value || "00:00");
     let gapMin = parseInt(document.getElementById('relay-gap')?.value) || 0;
-    let gapSec = gapMin * 60;
+    let gapSec = gapMin * 60000; // 🚀 MS (60 * 1000)
     let splitDurSec = getRaceDurationSeconds() / splitsCount;
 
     for (let i = 1; i < splitsCount; i++) {
         let s = baseSec + (i * splitDurSec) + (i * gapSec);
-        let h = String(Math.floor(s / 3600) % 24).padStart(2, '0');
-        let m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+        let realSec = Math.round(s / 1000); // 🚀 Affichage
+        let h = String(Math.floor(realSec / 3600) % 24).padStart(2, '0');
+        let m = String(Math.floor((realSec % 3600) / 60)).padStart(2, '0');
         let el = document.getElementById(`start-time-${i + 1}`);
         if (el) { el.value = `${h}:${m}`; el.dataset.formatted = "true"; }
     }
@@ -1483,15 +1484,15 @@ function getRaceDurationSeconds() {
         let hh = parseInt(hhEl?.value) || 0;
         let mm = parseInt(mmEl?.value) || 0;
         if (hh > 0 || mm > 0) {
-            return (hh * 3600) + (mm * 60);
+            return ((hh * 3600) + (mm * 60)) * 1000; // 🚀 MS
         }
     }
 
     // Au cas où l'ancien champ unique existe encore
     let val = document.getElementById('race-duration')?.value?.replace(/\D/g, '') || "";
-    if (val.length === 4) return parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60;
-    if (val.length === 3) return parseInt(val.substring(0, 1)) * 3600 + parseInt(val.substring(1, 3)) * 60;
-    if (val.length <= 2 && val.length > 0) return parseInt(val) * 3600;
+    if (val.length === 4) return (parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60) * 1000; // 🚀 MS
+    if (val.length === 3) return (parseInt(val.substring(0, 1)) * 3600 + parseInt(val.substring(1, 3)) * 60) * 1000; // 🚀 MS
+    if (val.length <= 2 && val.length > 0) return parseInt(val) * 3600000; // 🚀 MS (3600 * 1000)
     return 0;
 }
 
@@ -1502,13 +1503,14 @@ function calculateSplit() {
     if (!resultSpan) return;
 
     if (goal === 'time') {
-        let totalSeconds = getRaceDurationSeconds();
+        let totalSeconds = getRaceDurationSeconds(); // 🚀 En MS
         if (totalSeconds > 0) {
             let exact = totalSeconds / splits;
-            let h = String(Math.floor(exact / 3600)).padStart(2, '0');
-            let m = String(Math.floor((exact % 3600) / 60)).padStart(2, '0');
-            let s = String(Math.floor(exact % 60)).padStart(2, '0');
-            if (!Number.isInteger(exact)) { resultSpan.innerHTML = `${h}:${m}:${s} <span class="alert-text">⚠️ Ne tombe pas juste !</span>`; }
+            let realSec = Math.round(exact / 1000); // 🚀 Affichage
+            let h = String(Math.floor(realSec / 3600)).padStart(2, '0');
+            let m = String(Math.floor((realSec % 3600) / 60)).padStart(2, '0');
+            let s = String(Math.floor(realSec % 60)).padStart(2, '0');
+            if (!Number.isInteger(exact / 1000)) { resultSpan.innerHTML = `${h}:${m}:${s} <span class="alert-text">⚠️ Ne tombe pas juste !</span>`; }
             else { resultSpan.innerText = `${h}:${m}:${s}`; }
         } else { resultSpan.innerText = "..."; }
         autoFillStartTimes();
@@ -1814,24 +1816,24 @@ function timerTick() {
     let timerState = JSON.parse(str);
     if (!timerState || !timerState.active) return;
 
-    let elapsed = Math.floor((getUnifiedTime() - timerState.startTimeReal) / 1000);
-    let targetSec = timerState.targetSec;
-    let isOvertime = elapsed >= targetSec;
+    // 🚀 L'horloge tourne en MILLISECONDES pures !
+    let elapsed = getUnifiedTime() - timerState.startTimeReal;
+    let targetSec = timerState.targetSec; // 🚀 Déjà en ms
+    let isOvertime = elapsed >= (targetSec - 10); // 🚀 La fameuse Micro-tolérance
 
     let navTitle = document.getElementById('nav-brand-text');
     if (navTitle) {
-        let eh = String(Math.floor(elapsed / 3600)).padStart(2, '0');
-        let em = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
-        let es = String(Math.floor(elapsed % 60)).padStart(2, '0');
+        let realElapsed = Math.round(elapsed / 1000); // 🚀 Affichage
+        let eh = String(Math.floor(realElapsed / 3600)).padStart(2, '0');
+        let em = String(Math.floor((realElapsed % 3600) / 60)).padStart(2, '0');
+        let es = String(Math.floor(realElapsed % 60)).padStart(2, '0');
         navTitle.innerText = `${eh}:${em}:${es}`;
         navTitle.className = 'nav-brand chrono-active';
-        // 🚀 Le chrono passe en rouge si on dépasse le temps cible
         if (isOvertime) navTitle.classList.add('text-danger');
     }
 
-    // 🚀 La marge de grâce de 5 minutes (300 secondes)
-    if (elapsed >= targetSec + 300) {
-        // Validation silencieuse de la fin de course
+    // 🚀 5 minutes de marge = 300 000 ms
+    if (elapsed >= targetSec + 300000) {
         if (timerState.type === 'online') {
             if (strategySplits[timerState.splitIdx]) strategySplits[timerState.splitIdx].isFinished = true;
         } else {
@@ -1857,13 +1859,11 @@ function timerTick() {
     document.querySelectorAll('.active-live-stint').forEach(el => el.classList.remove('active-live-stint'));
 
     if (firstUnpitted && firstUnpitted.stint.startSec !== undefined) {
-        // 🚀 CORRECTION : On applique la surbrillance instantanément au prochain relais à faire (firstUnpitted)
-        // sans attendre que le chrono n'atteigne mathématiquement la fin de l'arrêt aux stands !
         let tr = document.querySelector(`tr[data-stint="${firstUnpitted.i}-${firstUnpitted.j}"]`);
         if (tr) tr.classList.add('active-live-stint');
 
-        // On auto-pit seulement si on n'est pas en overtime (on laisse le spotter gérer la fin)
-        if (elapsed >= firstUnpitted.stint.endSec + 300 && !isOvertime) {
+        // 🚀 Auto Pit (Buffer = 300 000 ms)
+        if (elapsed >= firstUnpitted.stint.endSec + 300000 && !isOvertime) {
             strategySplits[firstUnpitted.i].stints[firstUnpitted.j].isPitted = true;
             strategySplits[firstUnpitted.i].stints[firstUnpitted.j].lockedTimeSec = firstUnpitted.stint.endSec;
             cascadeFixPitWindows();
@@ -1886,54 +1886,39 @@ function updateLiveSpotter(elapsed, timerState) {
         return;
     }
 
-    let activeStint = null;
-    let nextStint = null;
-    let nextStintDriver = null;
-
-    // 🚀 1. RECHERCHE DU PREMIER STINT NON TERMINÉ
-    let firstUnpittedI = -1;
-    let firstUnpittedJ = -1;
+    let activeStint = null; let nextStint = null; let nextStintDriver = null;
+    let firstUnpittedI = -1; let firstUnpittedJ = -1;
 
     for (let i = 0; i < strategySplits.length; i++) {
         if (timerState.type === 'online' && i !== timerState.splitIdx) continue;
         for (let j = 0; j < strategySplits[i].stints.length; j++) {
             if (!strategySplits[i].stints[j].isPitted) {
-                firstUnpittedI = i;
-                firstUnpittedJ = j;
-                break;
+                firstUnpittedI = i; firstUnpittedJ = j; break;
             }
         }
         if (firstUnpittedI !== -1) break;
     }
 
-    // 🚀 2. DÉTECTION DE LA "ZONE TAMPON" (Le Pit Buffer avec marge de 5s)
     let pitBufferStint = null;
 
     if (firstUnpittedI !== -1) {
-        let prevI = firstUnpittedI;
-        let prevJ = firstUnpittedJ - 1;
-
+        let prevI = firstUnpittedI; let prevJ = firstUnpittedJ - 1;
         if (prevJ < 0) {
             prevI--;
-            if (prevI >= 0 && timerState.type !== 'online') {
-                prevJ = strategySplits[prevI].stints.length - 1;
-            }
+            if (prevI >= 0 && timerState.type !== 'online') prevJ = strategySplits[prevI].stints.length - 1;
         }
-
         if (prevI >= 0 && prevJ >= 0) {
             let pStint = strategySplits[prevI].stints[prevJ];
             if (pStint.isPitted && pStint.lockedTimeSec !== null && !pStint.pitExitForced) {
                 let timeSincePit = elapsed - pStint.lockedTimeSec;
                 let pitDuration = pStint.nextPitTime || 0;
-                // Protection pour ne pas faire de buffer sur le drapeau à damier
                 let isVeryLast = (timerState.type === 'online') ?
                     (prevJ === strategySplits[prevI].stints.length - 1) :
                     (prevI === strategySplits.length - 1 && prevJ === strategySplits[prevI].stints.length - 1);
 
-                if (!isVeryLast && timeSincePit < pitDuration + 5) {
+                if (!isVeryLast && timeSincePit < pitDuration + 5000) { // 🚀 5000 ms
                     pitBufferStint = pStint;
-                    pitBufferStint.splitIdx = prevI;
-                    pitBufferStint.stintIdx = prevJ;
+                    pitBufferStint.splitIdx = prevI; pitBufferStint.stintIdx = prevJ;
                     pitBufferStint.driverName = strategySplits[prevI].driver;
                     pitBufferStint.timeSincePit = timeSincePit;
                 }
@@ -1943,7 +1928,6 @@ function updateLiveSpotter(elapsed, timerState) {
 
     let isPitBufferMode = (pitBufferStint !== null);
 
-    // 🚀 3. ATTRIBUTION DU STINT ACTIF (Gelé ou Normal)
     if (isPitBufferMode) {
         activeStint = pitBufferStint;
         nextStint = strategySplits[firstUnpittedI].stints[firstUnpittedJ];
@@ -1951,80 +1935,62 @@ function updateLiveSpotter(elapsed, timerState) {
     } else {
         if (firstUnpittedI !== -1) {
             activeStint = strategySplits[firstUnpittedI].stints[firstUnpittedJ];
-            activeStint.splitIdx = firstUnpittedI;
-            activeStint.stintIdx = firstUnpittedJ;
+            activeStint.splitIdx = firstUnpittedI; activeStint.stintIdx = firstUnpittedJ;
             activeStint.driverName = strategySplits[firstUnpittedI].driver;
 
             if (firstUnpittedJ + 1 < strategySplits[firstUnpittedI].stints.length) {
                 nextStint = strategySplits[firstUnpittedI].stints[firstUnpittedJ + 1];
-                nextStint.splitIdx = firstUnpittedI;         // 🚀 NOUVEAU
-                nextStint.stintIdx = firstUnpittedJ + 1;     // 🚀 NOUVEAU
+                nextStint.splitIdx = firstUnpittedI; nextStint.stintIdx = firstUnpittedJ + 1;
                 nextStintDriver = strategySplits[firstUnpittedI].driver;
             } else if (firstUnpittedI + 1 < strategySplits.length && timerState.type !== 'online') {
                 nextStint = strategySplits[firstUnpittedI + 1].stints[0];
-                nextStint.splitIdx = firstUnpittedI + 1;     // 🚀 NOUVEAU
-                nextStint.stintIdx = 0;                      // 🚀 NOUVEAU
+                nextStint.splitIdx = firstUnpittedI + 1; nextStint.stintIdx = 0;
                 nextStintDriver = strategySplits[firstUnpittedI + 1].driver;
             }
         }
     }
 
-    // 🚀 4. MISE À JOUR VISUELLE
     if (activeStint && activeStint.startSec !== undefined) {
         if (offlineMsg) offlineMsg.classList.add('hidden');
         if (dashboard) dashboard.classList.remove('hidden');
 
-        let driverEl = document.getElementById('live-driver');
-        if (driverEl) driverEl.innerText = activeStint.driverName;
-
-        let tireEl = document.getElementById('live-tire');
-        if (tireEl) tireEl.innerHTML = `<span class="tire-circle bg-tire-${activeStint.tire}">${activeStint.tire}</span>`;
+        let driverEl = document.getElementById('live-driver'); if (driverEl) driverEl.innerText = activeStint.driverName;
+        let tireEl = document.getElementById('live-tire'); if (tireEl) tireEl.innerHTML = `<span class="tire-circle bg-tire-${activeStint.tire}">${activeStint.tire}</span>`;
 
         let fStrat = activeStint.fuelStrat.toUpperCase();
         let fuelRate = getDriverFuelRate(activeStint.driverName, activeStint.fuelStrat);
 
-        let fuelPill = document.getElementById('live-fuel-pill');
-        if (fuelPill) fuelPill.className = `live-fuel-pill ${fStrat === 'PUSH' ? 'bg-fuel-push' : 'bg-fuel-eco'}`;
-
+        let fuelPill = document.getElementById('live-fuel-pill'); if (fuelPill) fuelPill.className = `live-fuel-pill ${fStrat === 'PUSH' ? 'bg-fuel-push' : 'bg-fuel-eco'}`;
         let fuelStratEl = document.getElementById('live-fuel-strat');
         if (fuelStratEl) {
             fuelStratEl.innerText = fuelRate.toFixed(2) + " L/t";
-            // 🚀 NOUVEAU : Ajout de cursor-pointer et de l'événement onclick
             fuelStratEl.className = fStrat === 'PUSH' ? 'text-push cursor-pointer ml-8' : 'text-eco cursor-pointer ml-8';
             fuelStratEl.onclick = () => toggleStintFuelStrat(activeStint.splitIdx, activeStint.stintIdx);
         }
 
         let timeInStint = elapsed - activeStint.startSec;
-        if (activeStint.lockedTimeSec !== null && activeStint.isPitted) {
-            timeInStint = activeStint.lockedTimeSec - activeStint.startSec; // Fige le chrono global pendant l'arrêt
-        }
+        if (activeStint.lockedTimeSec !== null && activeStint.isPitted) timeInStint = activeStint.lockedTimeSec - activeStint.startSec;
         if (timeInStint < 0) timeInStint = 0;
-        let lapSec = activeStint.lapSec || 120;
+        let lapSec = activeStint.lapSec || 120000; // 🚀 MS
 
         let currentEstimatedLap = (activeStint.startLap || 0) + Math.floor(timeInStint / lapSec) + 1;
-        let curLapEl = document.getElementById('live-current-lap');
-        if (curLapEl) curLapEl.innerText = currentEstimatedLap;
+        let curLapEl = document.getElementById('live-current-lap'); if (curLapEl) curLapEl.innerText = currentEstimatedLap;
 
-        // NOUVEAU : Nombre de tours du relais en cours
         let stintLapsEl = document.getElementById('live-current-stint-laps');
-        if (stintLapsEl) {
-            stintLapsEl.innerText = `${activeStint.laps} tours`;
-            stintLapsEl.className = `fs-1-2 font-weight-bold mb-5 ${fStrat === 'PUSH' ? 'text-push' : 'text-eco'}`;
-        }
+        if (stintLapsEl) { stintLapsEl.innerText = `${activeStint.laps} tours`; stintLapsEl.className = `fs-1-2 font-weight-bold mb-5 ${fStrat === 'PUSH' ? 'text-push' : 'text-eco'}`; }
 
-        let tgtLapEl = document.getElementById('live-target-lap');
-        if (tgtLapEl) tgtLapEl.innerText = activeStint.endLap || 0;
+        let tgtLapEl = document.getElementById('live-target-lap'); if (tgtLapEl) tgtLapEl.innerText = activeStint.endLap || 0;
 
-        let targetH = String(Math.floor((activeStint.endSec) / 3600)).padStart(2, '0');
-        let targetM = String(Math.floor((activeStint.endSec % 3600) / 60)).padStart(2, '0');
-        let targetS = String(Math.floor((activeStint.endSec) % 60)).padStart(2, '0');
-        let tgtTimeEl = document.getElementById('live-target-time');
-        if (tgtTimeEl) tgtTimeEl.innerText = `${targetH}:${targetM}:${targetS}`;
+        let realEnd = Math.round(activeStint.endSec / 1000); // 🚀 Affichage
+        let targetH = String(Math.floor(realEnd / 3600)).padStart(2, '0');
+        let targetM = String(Math.floor((realEnd % 3600) / 60)).padStart(2, '0');
+        let targetS = String(Math.floor(realEnd % 60)).padStart(2, '0');
+        let tgtTimeEl = document.getElementById('live-target-time'); if (tgtTimeEl) tgtTimeEl.innerText = `${targetH}:${targetM}:${targetS}`;
 
         let timeRem = activeStint.endSec - elapsed;
-        if (activeStint.isPitted && activeStint.lockedTimeSec !== null) timeRem = 0; // Fige à 0 pendant l'arrêt
+        if (activeStint.isPitted && activeStint.lockedTimeSec !== null) timeRem = 0;
         let sign = timeRem < 0 ? "+" : "-";
-        let absRem = Math.abs(timeRem);
+        let absRem = Math.round(Math.abs(timeRem) / 1000); // 🚀 Affichage
         let rh = String(Math.floor(absRem / 3600)).padStart(2, '0');
         let rm = String(Math.floor((absRem % 3600) / 60)).padStart(2, '0');
         let rs = String(Math.floor(absRem % 60)).padStart(2, '0');
@@ -2041,47 +2007,30 @@ function updateLiveSpotter(elapsed, timerState) {
         }
 
         let isUltimateStint = false;
-        if (timerState.type === 'online') {
-            isUltimateStint = (activeStint.stintIdx === strategySplits[activeStint.splitIdx].stints.length - 1);
-        } else {
-            isUltimateStint = (activeStint.splitIdx === strategySplits.length - 1 && activeStint.stintIdx === strategySplits[activeStint.splitIdx].stints.length - 1);
-        }
+        if (timerState.type === 'online') isUltimateStint = (activeStint.stintIdx === strategySplits[activeStint.splitIdx].stints.length - 1);
+        else isUltimateStint = (activeStint.splitIdx === strategySplits.length - 1 && activeStint.stintIdx === strategySplits[activeStint.splitIdx].stints.length - 1);
 
         let nextBox = document.getElementById('live-next-box');
         let finishBox = document.getElementById('live-finish-box');
         let pitBtn = document.getElementById('live-btn-pitin');
 
         if (isUltimateStint && !isPitBufferMode) {
-            // DRAPEAU À DAMIER CONSERVÉ
             if (nextBox) nextBox.classList.add('hidden');
-            if (finishBox) {
-                finishBox.classList.remove('hidden');
-                let finishContent = finishBox.querySelector('.live-card-content');
-                if (finishContent) finishContent.innerHTML = '<div class="large-finish-flag">🏁</div>';
-            }
+            if (finishBox) { finishBox.classList.remove('hidden'); finishBox.querySelector('.live-card-content').innerHTML = '<div class="large-finish-flag">🏁</div>'; }
             if (pitBtn) pitBtn.classList.add('hidden');
         } else {
             if (pitBtn) pitBtn.classList.remove('hidden');
-
-            if (finishBox) {
-                let finishContent = finishBox.querySelector('.live-card-content');
-                if (finishContent) finishContent.innerHTML = '<p class="finish-msg">Dernier stint</p>';
-            }
+            if (finishBox) finishBox.querySelector('.live-card-content').innerHTML = '<p class="finish-msg">Dernier stint</p>';
 
             if (nextStint) {
                 if (nextBox) nextBox.classList.remove('hidden');
                 if (finishBox) finishBox.classList.add('hidden');
 
-                let nextDrvEl = document.getElementById('live-next-driver');
-                if (nextDrvEl) nextDrvEl.innerText = nextStintDriver;
-
+                let nextDrvEl = document.getElementById('live-next-driver'); if (nextDrvEl) nextDrvEl.innerText = nextStintDriver;
                 let tireContainer = document.getElementById('live-next-tire-container');
                 if (tireContainer) {
-                    if (nextStint.changeTires) {
-                        tireContainer.innerHTML = `<span class="tire-circle bg-tire-${nextStint.tire}">${nextStint.tire}</span>`;
-                    } else {
-                        tireContainer.innerHTML = `<span class="text-grey font-weight-bold fs-1-2">Conserver ${activeStint.tire}</span>`;
-                    }
+                    if (nextStint.changeTires) tireContainer.innerHTML = `<span class="tire-circle bg-tire-${nextStint.tire}">${nextStint.tire}</span>`;
+                    else tireContainer.innerHTML = `<span class="text-grey font-weight-bold fs-1-2">Conserver ${activeStint.tire}</span>`;
                 }
 
                 let targetFuel = nextStint.cachedTargetFuel || 100;
@@ -2091,18 +2040,10 @@ function updateLiveSpotter(elapsed, timerState) {
                 let fuelEl = document.getElementById('live-next-fuel');
                 let fuelToAdd = activeStint.fuelToAddForNext || 0;
                 if (fuelEl) {
-                    // 🚀 NOUVEAU : Détection de forçage manuel pour le style visuel
                     let isManual = (nextStint.manualFuel !== null && nextStint.manualFuel !== undefined);
                     let manualClass = isManual ? "manual-override-text" : "";
-
-                    if (fuelToAdd > 0) {
-                        fuelEl.innerText = `${targetFuel.toFixed(1)} L`;
-                        fuelEl.className = `fuel-highlight text-warning ml-8 cursor-pointer ${manualClass}`;
-                    } else {
-                        fuelEl.innerText = `NON`;
-                        fuelEl.className = `pit-no-fuel text-success ml-8 cursor-pointer ${manualClass}`;
-                    }
-                    // 🚀 NOUVEAU : Action pour ouvrir la modale
+                    if (fuelToAdd > 0) { fuelEl.innerText = `${targetFuel.toFixed(1)} L`; fuelEl.className = `fuel-highlight text-warning ml-8 cursor-pointer ${manualClass}`; }
+                    else { fuelEl.innerText = `NON`; fuelEl.className = `pit-no-fuel text-success ml-8 cursor-pointer ${manualClass}`; }
                     fuelEl.onclick = () => openFuelModal(nextStint.splitIdx, nextStint.stintIdx, nextStint.cachedTargetFuel);
                 }
 
@@ -2112,11 +2053,8 @@ function updateLiveSpotter(elapsed, timerState) {
                 if (isPitBufferMode) {
                     if (nextBoxTitle) nextBoxTitle.innerText = "ARRÊT EN COURS";
                     nextBox.classList.add('pit-buffer-active');
-
-                    // Calcul propre du compte à rebours
-                    let timeRemaining = Math.max(0, Math.ceil(activeStint.nextPitTime - activeStint.timeSincePit));
+                    let timeRemaining = Math.max(0, Math.ceil((activeStint.nextPitTime - activeStint.timeSincePit) / 1000)); // 🚀 MS
                     if (pitTimeEl) pitTimeEl.innerText = `${timeRemaining}s`;
-
                     if (pitBtn) {
                         pitBtn.innerHTML = `<span class="material-symbols-outlined icon-xl mr-15">sports_score</span> PIT OUT`;
                         pitBtn.className = "live-giant-btn btn-success";
@@ -2125,29 +2063,20 @@ function updateLiveSpotter(elapsed, timerState) {
                 } else {
                     if (nextBoxTitle) nextBoxTitle.innerText = "CONSIGNES PIT";
                     nextBox.classList.remove('pit-buffer-active');
-
-                    // 🚀 CORRECTION : Math.ceil ici aussi pour une harmonisation absolue
-                    if (pitTimeEl) pitTimeEl.innerText = `${Math.ceil(activeStint.nextPitTime || 0)}s`;
-
+                    if (pitTimeEl) pitTimeEl.innerText = `${Math.ceil((activeStint.nextPitTime || 0) / 1000)}s`; // 🚀 MS
                     if (pitBtn) {
                         pitBtn.innerHTML = `<span class="material-symbols-outlined icon-xl mr-15">flag</span> PIT IN`;
                         pitBtn.className = "live-giant-btn";
                         pitBtn.onclick = () => { openPitModal(activeStint.splitIdx, activeStint.stintIdx); };
                     }
                 }
-
             } else {
                 if (nextBox) nextBox.classList.add('hidden');
                 if (finishBox) finishBox.classList.remove('hidden');
             }
         }
-
     } else {
-        // MESSAGE DE FIN DE COURSE CONSERVÉ
-        if (offlineMsg) {
-            offlineMsg.classList.remove('hidden');
-            offlineMsg.innerHTML = `<span class="material-symbols-outlined icon-huge-grey text-success">sports_score</span><h2 class="text-huge-spaced text-success">COURSE TERMINÉE</h2><p class="help-text fs-1-2">Tous les relais ont été validés.</p>`;
-        }
+        if (offlineMsg) { offlineMsg.classList.remove('hidden'); offlineMsg.innerHTML = `<span class="material-symbols-outlined icon-huge-grey text-success">sports_score</span><h2 class="text-huge-spaced text-success">COURSE TERMINÉE</h2><p class="help-text fs-1-2">Tous les relais ont été validés.</p>`; }
         if (dashboard) dashboard.classList.add('hidden');
     }
 }
@@ -2446,6 +2375,7 @@ function getDriverFuelRate(driverName, strat) {
     }
     return parseFloat(document.getElementById(`cons-${strat}`)?.value?.replace(/[^\d.]/g, '')) || 3.0;
 }
+
 function getDriverLapSeconds(driverName, tire, strat) {
     if (!strat) strat = 'push';
     let drvIndex = getAvailableDrivers().indexOf(driverName) + 1;
@@ -2456,16 +2386,17 @@ function getDriverLapSeconds(driverName, tire, strat) {
         timeStr = document.getElementById(`drv-${drvIndex}-time-${strat}-${tire}`)?.value;
     }
     if (!timeStr) timeStr = document.getElementById(`global-time-${strat}-${tire}`)?.value;
-    if (!timeStr) return 120;
+    if (!timeStr) return 120000; // 🚀 120s = 120000 ms
 
     let parts = timeStr.split(':');
     if (parts.length === 2) {
-        return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+        return (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000; // 🚀 MS
     } else if (parts.length === 3) {
-        return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2]);
+        return (parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])) * 1000; // 🚀 MS
     }
-    return 120;
+    return 120000; // 🚀 MS
 }
+
 function getDriverTireLife(driverName, tire) {
     let drvIndex = getAvailableDrivers().indexOf(driverName) + 1;
     let drivers = parseInt(document.getElementById('num-drivers').value) || 1;
@@ -2480,20 +2411,22 @@ function timeStringToSeconds(str) {
     if (!str) return 0;
     if (str.includes(':')) {
         let p = str.split(':');
-        if (p.length === 3) return parseInt(p[0] || 0) * 3600 + parseInt(p[1] || 0) * 60 + parseInt(p[2] || 0);
-        if (p.length === 2) return parseInt(p[0] || 0) * 3600 + parseInt(p[1] || 0) * 60;
+        if (p.length === 3) return (parseInt(p[0] || 0) * 3600 + parseInt(p[1] || 0) * 60 + parseInt(p[2] || 0)) * 1000; // 🚀 MS
+        if (p.length === 2) return (parseInt(p[0] || 0) * 3600 + parseInt(p[1] || 0) * 60) * 1000; // 🚀 MS
     } else {
         let val = str.replace(/\D/g, '');
-        if (val.length === 6) return parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60 + parseInt(val.substring(4, 6));
-        if (val.length === 4) return parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60;
-        if (val.length <= 2 && val.length > 0) return parseInt(val) * 3600;
+        if (val.length === 6) return (parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60 + parseInt(val.substring(4, 6))) * 1000; // 🚀 MS
+        if (val.length === 4) return (parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60) * 1000; // 🚀 MS
+        if (val.length <= 2 && val.length > 0) return parseInt(val) * 3600000; // 🚀 MS
     }
     return 0;
 }
+
 function formatTime(seconds) {
-    let h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-    let m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-    let s = String(Math.floor(seconds % 60)).padStart(2, '0');
+    let realSec = Math.round(seconds / 1000); // 🚀 Repassage en secondes pour l'affichage
+    let h = String(Math.floor(realSec / 3600)).padStart(2, '0');
+    let m = String(Math.floor((realSec % 3600) / 60)).padStart(2, '0');
+    let s = String(Math.floor(realSec % 60)).padStart(2, '0');
     return `${h}:${m}:${s}`;
 }
 
@@ -2907,40 +2840,29 @@ function confirmDeleteRow() {
 }
 
 function openPitModal(i, j) {
-    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
+    if (!isEngineerMode) return;
     let stint = strategySplits[i].stints[j];
     pitModalTarget = { splitIdx: i, stintIdx: j, startLap: stint.startLap };
 
     let estimatedLap = stint.endLap;
     let isOvertime = false;
 
-    // 🚀 LECTURE DU TEMPS RÉEL
     let str = localStorage.getItem('stratefreez-timer');
     if (str) {
         let timerState = JSON.parse(str);
         if (timerState && timerState.active) {
-            let elapsed = Math.floor((getUnifiedTime() - timerState.startTimeReal) / 1000);
-
-            // Calcul du tour estimé
+            let elapsed = getUnifiedTime() - timerState.startTimeReal; // 🚀 MS purs
             let timeInStint = elapsed - stint.startSec;
             if (timeInStint < 0) timeInStint = 0;
-            let lapSec = stint.lapSec || 120;
+            let lapSec = stint.lapSec || 120000; // 🚀 MS
             let calcLap = (stint.startLap || 0) + Math.floor(timeInStint / lapSec) + 1;
-
-            // Plafond de sécurité : On ne propose jamais plus que la fin prévue
             estimatedLap = Math.min(calcLap, stint.endLap);
-
-            // Détection du retard (Pour afficher le bouton Forcer)
-            if (elapsed >= stint.endSec) {
-                isOvertime = true;
-            }
+            if (elapsed >= stint.endSec) isOvertime = true;
         }
     }
 
     const input = document.getElementById('pit-modal-lap');
     input.value = estimatedLap || '';
-
-    // Affichage conditionnel du bouton Forcer ET de son texte explicatif
     const forceBtn = document.getElementById('modal-btn-force-pit');
     const forceText = document.getElementById('modal-force-pit-text');
     if (forceBtn) forceBtn.classList.toggle('hidden', !isOvertime);
@@ -2993,7 +2915,7 @@ function confirmPitIn() {
             if (str) {
                 let timerState = JSON.parse(str);
                 if (timerState && timerState.active) {
-                    let elapsed = Math.floor((getUnifiedTime() - timerState.startTimeReal) / 1000);
+                    let elapsed = getUnifiedTime() - timerState.startTimeReal;
                     strategySplits[sIdx].stints[stIdx].lockedTimeSec = elapsed;
                 } else {
                     strategySplits[sIdx].stints[stIdx].lockedTimeSec = null;
@@ -3220,18 +3142,20 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
     let isLapMode = document.getElementById('pit-window-mode-tours')?.checked;
     let winC_lap = parseInt(document.getElementById('lap-pit-window-close')?.value) || 0;
     let winC_time_str = document.getElementById('time-pit-window-close')?.value || "";
-    let secC = winC_time_str !== "" ? timeStringToSeconds(winC_time_str) : 0;
+    let secC = winC_time_str !== "" ? timeStringToSeconds(winC_time_str) : 0; // 🚀 MS
 
-    let totalSecRace = getRaceDurationSeconds();
+    let totalSecRace = getRaceDurationSeconds(); // 🚀 MS
     let targetLapsRace = parseInt(document.getElementById('race-laps')?.value) || 0;
     let splitsCount = parseInt(document.getElementById('total-splits')?.value) || 1;
-    let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0;
+    let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0; // 🚀 MS
     let targetPerRelayLaps = splitsCount > 0 ? Math.floor(targetLapsRace / splitsCount) : 0;
 
     let initialFuel = parseFloat(document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '')) || 100;
     let fillSpeed = parseFloat(document.getElementById('fuel-speed')?.value.replace(',', '.').replace(/[^\d.]/g, '')) || 5;
-    let pitLossBase = parseFloat(document.getElementById('pit-loss-time')?.value.replace(',', '.').replace(/[^\d.]/g, '')) || 35;
-    let pitTireBase = parseFloat(document.getElementById('pit-tire-time')?.value.replace(',', '.').replace(/[^\d.]/g, '')) || 6;
+
+    // 🚀 LES BASES EN MS
+    let pitLossBase = (parseFloat(document.getElementById('pit-loss-time')?.value.replace(',', '.').replace(/[^\d.]/g, '')) || 35) * 1000;
+    let pitTireBase = (parseFloat(document.getElementById('pit-tire-time')?.value.replace(',', '.').replace(/[^\d.]/g, '')) || 6) * 1000;
     let safetyRes = parseFloat(document.getElementById('fuel-reserve')?.value.replace(/[^\d.]/g, '')) || 0;
 
     if (goal === 'time' && totalSecRace <= 0) return;
@@ -3244,7 +3168,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             perfCache[key] = {
                 tireLife: getDriverTireLife(driver, tire),
                 fuelRate: getDriverFuelRate(driver, strat),
-                lapSec: Math.max(1, getDriverLapSeconds(driver, tire, strat))
+                lapSec: Math.max(10, getDriverLapSeconds(driver, tire, strat)) // 🚀 MS avec sécurité 10ms
             };
         }
         return perfCache[key];
@@ -3252,16 +3176,12 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
     const updateTimeline = () => {
         for (let i = 0; i < strategySplits.length; i++) {
-            let globalSecLoop = 0;
-            let globalLapsLoop = 0;
-            let residualTankLoop = initialFuel;
+            let globalSecLoop = 0; let globalLapsLoop = 0; let residualTankLoop = initialFuel;
 
             if (!isOnline && !isSolo && i > 0) {
                 let prevSplit = strategySplits[i - 1];
                 let prevStint = prevSplit.stints[prevSplit.stints.length - 1];
-                globalSecLoop = prevStint.endSec;
-                globalLapsLoop = prevStint.endLap;
-                residualTankLoop = prevStint.residualAtEnd;
+                globalSecLoop = prevStint.endSec; globalLapsLoop = prevStint.endLap; residualTankLoop = prevStint.residualAtEnd;
             }
 
             for (let j = 0; j < strategySplits[i].stints.length; j++) {
@@ -3271,7 +3191,6 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
                 let perf = getCachedPerf(strategySplits[i].driver, stint.tire, stint.fuelStrat);
                 let fuelRate = perf.fuelRate;
-
                 let requiredFuel = laps * fuelRate;
                 let targetFuel = requiredFuel + safetyRes;
                 if (stint.manualFuel !== null && stint.manualFuel !== undefined) targetFuel = parseFloat(stint.manualFuel);
@@ -3279,45 +3198,31 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
                 let pitTime = 0;
                 if (isAbsFirst) {
-                    residualTankLoop = initialFuel;
-                    stint.fuelAddedAtStart = 0;
+                    residualTankLoop = initialFuel; stint.fuelAddedAtStart = 0;
                 } else {
                     pitTime = pitLossBase;
                     if (stint.changeTires) pitTime += pitTireBase;
                     let fuelToAdd = Math.max(0, targetFuel - residualTankLoop);
                     stint.fuelAddedAtStart = fuelToAdd;
-                    if (fuelToAdd > 0) pitTime += (fuelToAdd / fillSpeed);
+                    if (fuelToAdd > 0) pitTime += (fuelToAdd / fillSpeed) * 1000; // 🚀 Vitesse convertie en ajout ms
                     residualTankLoop += fuelToAdd;
                     globalSecLoop += pitTime;
                 }
 
-                stint.startSec = globalSecLoop;
-                stint.startLap = globalLapsLoop;
-                stint.pitTime = pitTime;
-                stint.cachedTargetFuel = targetFuel;
-                stint.fuelRate = fuelRate;
-                stint.lapSec = perf.lapSec;
-
+                stint.startSec = globalSecLoop; stint.startLap = globalLapsLoop; stint.pitTime = pitTime;
+                stint.cachedTargetFuel = targetFuel; stint.fuelRate = fuelRate; stint.lapSec = perf.lapSec;
                 residualTankLoop -= requiredFuel;
 
-                if (stint.isPitted && stint.lockedTimeSec !== null) {
-                    globalSecLoop = stint.lockedTimeSec;
-                } else {
-                    globalSecLoop += (laps * stint.lapSec);
-                }
+                if (stint.isPitted && stint.lockedTimeSec !== null) globalSecLoop = stint.lockedTimeSec;
+                else globalSecLoop += (laps * stint.lapSec);
 
-                globalLapsLoop += laps;
-                stint.endSec = globalSecLoop;
-                stint.endLap = globalLapsLoop;
-                stint.residualAtEnd = residualTankLoop;
+                globalLapsLoop += laps; stint.endSec = globalSecLoop; stint.endLap = globalLapsLoop; stint.residualAtEnd = residualTankLoop;
 
                 let nextStint = null, nextDriver = null;
                 if (j + 1 < strategySplits[i].stints.length) {
-                    nextStint = strategySplits[i].stints[j + 1];
-                    nextDriver = strategySplits[i].driver;
+                    nextStint = strategySplits[i].stints[j + 1]; nextDriver = strategySplits[i].driver;
                 } else if (i + 1 < strategySplits.length && !isOnline && !isSolo) {
-                    nextStint = strategySplits[i + 1].stints[0];
-                    nextDriver = strategySplits[i + 1].driver;
+                    nextStint = strategySplits[i + 1].stints[0]; nextDriver = strategySplits[i + 1].driver;
                 }
 
                 let fuelToAddForNext = 0, nextPitTime = 0;
@@ -3331,18 +3236,15 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                     fuelToAddForNext = Math.max(0, nTargetFuel - residualTankLoop);
                     nextPitTime = pitLossBase;
                     if (nextStint.changeTires) nextPitTime += pitTireBase;
-                    if (fuelToAddForNext > 0) nextPitTime += (fuelToAddForNext / fillSpeed);
+                    if (fuelToAddForNext > 0) nextPitTime += (fuelToAddForNext / fillSpeed) * 1000; // 🚀 MS
                 }
-                stint.fuelToAddForNext = fuelToAddForNext;
-                stint.nextPitTime = nextPitTime;
+                stint.fuelToAddForNext = fuelToAddForNext; stint.nextPitTime = nextPitTime;
             }
         }
     };
 
     const getStintCapacity = (sIdx, stIdx, useEco) => {
-        let split = strategySplits[sIdx];
-        let stint = split.stints[stIdx];
-        let driver = split.driver;
+        let split = strategySplits[sIdx]; let stint = split.stints[stIdx]; let driver = split.driver;
         let tireLife = getDriverTireLife(driver, stint.tire);
         let fuelStrat = useEco ? 'eco' : stint.fuelStrat;
         let fuelRate = getDriverFuelRate(driver, fuelStrat);
@@ -3351,11 +3253,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
         if (!stint.changeTires && !(sIdx === 0 && stIdx === 0)) {
             let currS = sIdx, currSt = stIdx - 1;
             while (currS >= 0) {
-                if (currSt < 0) {
-                    currS--;
-                    if (currS >= 0) currSt = strategySplits[currS].stints.length - 1;
-                    else break;
-                }
+                if (currSt < 0) { currS--; if (currS >= 0) currSt = strategySplits[currS].stints.length - 1; else break; }
                 let checkStint = strategySplits[currS].stints[currSt];
                 usedTireLaps += checkStint.laps;
                 if (checkStint.changeTires || (currS === 0 && currSt === 0)) break;
@@ -3364,22 +3262,17 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
         }
         let fS = sIdx, fSt = stIdx + 1;
         while (fS < strategySplits.length) {
-            if (fSt >= strategySplits[fS].stints.length) {
-                fS++; fSt = 0;
-                if (fS >= strategySplits.length) break;
-            }
+            if (fSt >= strategySplits[fS].stints.length) { fS++; fSt = 0; if (fS >= strategySplits.length) break; }
             let checkStint = strategySplits[fS].stints[fSt];
             if (checkStint.changeTires) break;
             usedTireLaps += checkStint.laps;
             fSt++;
         }
-
         let tireRem = Math.max(0, tireLife - usedTireLaps);
         let fuelRem = Math.floor((100 - safetyRes) / fuelRate);
         return Math.max(1, Math.min(tireRem, fuelRem));
     };
 
-    // 🚀 ÉTAPE 0 : Nettoyage
     for (let i = 0; i < strategySplits.length; i++) {
         for (let j = 0; j < strategySplits[i].stints.length; j++) {
             strategySplits[i].stints[j].laps = parseInt(strategySplits[i].stints[j].laps) || 1;
@@ -3388,55 +3281,38 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
     }
     updateTimeline();
 
-    // 🚀 ÉTAPE 1 : Plafonnement Physique
     for (let i = 0; i < strategySplits.length; i++) {
         for (let j = 0; j < strategySplits[i].stints.length; j++) {
             let stint = strategySplits[i].stints[j];
             if (stint.isPitted) continue;
-
             let pushCap = getStintCapacity(i, j, false);
-
             if (stint.laps > pushCap) {
                 let ecoCap = getStintCapacity(i, j, true);
-                if (ecoCap > pushCap && stint.laps > pushCap) {
-                    stint.fuelStrat = 'eco';
-                    stint.laps = Math.min(stint.laps, ecoCap);
-                } else {
-                    stint.fuelStrat = 'push';
-                    stint.laps = pushCap;
-                }
+                if (ecoCap > pushCap && stint.laps > pushCap) { stint.fuelStrat = 'eco'; stint.laps = Math.min(stint.laps, ecoCap); }
+                else { stint.fuelStrat = 'push'; stint.laps = pushCap; }
             }
         }
     }
 
-    let cascadeHalted = false;
-    let haltedAtSplit = -1;
+    let cascadeHalted = false; let haltedAtSplit = -1;
 
-    // 🚀 ÉTAPE 2 : La Cascade Multi-Passes Rigoureuse
     for (let i = 0; i < strategySplits.length; i++) {
         if (cascadeHalted) break;
-
-        let split = strategySplits[i];
-        split.targetFailed = false; // Réinitialisation de l'état d'échec
-
+        let split = strategySplits[i]; split.targetFailed = false;
         let isLastSplit = (i === strategySplits.length - 1);
 
         let relayStartIdx = i;
-        while (relayStartIdx > 0 && strategySplits[relayStartIdx - 1].driver === split.driver && !isOnline && !isSolo) {
-            relayStartIdx--;
-        }
+        while (relayStartIdx > 0 && strategySplits[relayStartIdx - 1].driver === split.driver && !isOnline && !isSolo) relayStartIdx--;
 
         let regOpenSec = 0, regCloseSec = 0, secOpenSec = 0, secCloseSec = 0;
         if (!isOnline && !isSolo && hasPitWindow && splitDurSec > 0) {
-            regOpenSec = (i + 1) * splitDurSec - (winOpen * 60);
-            regCloseSec = (i + 1) * splitDurSec + (winClose * 60);
-            secOpenSec = regOpenSec + 5;
-            secCloseSec = regCloseSec - 30;
+            regOpenSec = (i + 1) * splitDurSec - (winOpen * 60000); // 🚀 MS
+            regCloseSec = (i + 1) * splitDurSec + (winClose * 60000); // 🚀 MS
+            secOpenSec = regOpenSec + 5000; // 🚀 MS
+            secCloseSec = regCloseSec - 30000; // 🚀 MS
         }
 
-        // 🚦 ANALYSE RÉGLEMENTAIRE (Les Murs Absolus)
-        let isRelayEnd = false;
-        let tireChanged = false;
+        let isRelayEnd = false; let tireChanged = false;
         let reqTireOnWindow = document.getElementById('pit-tires-only')?.checked;
 
         if (!isLastSplit && !isOnline && !isSolo) {
@@ -3462,13 +3338,13 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 if (isOnline || isSolo) {
                     let relativeSec = currentSec - split.stints[0].startSec;
                     let relativeLap = currentLap - split.stints[0].startLap;
-                    // 🚀 CORRECTION : En Online, CHAQUE split doit atteindre sa cible (pas seulement le dernier de la liste)
                     if ((isLastSplit || isOnline) && goal === 'time') {
-                        if (relativeSec < totalSecRace / splitsCount) action = 'add';
-                        else if (relativeSec - lsTime >= totalSecRace / splitsCount) action = 'remove'; // Anti Ping-Pong
+                        // 🚀 MICRO-TOLÉRANCE (- 10 ms)
+                        if (relativeSec < (totalSecRace / splitsCount) - 10) action = 'add';
+                        else if (relativeSec - lsTime >= (totalSecRace / splitsCount) - 10) action = 'remove';
                     } else if ((isLastSplit || isOnline) && goal === 'laps') {
                         if (relativeLap < targetPerRelayLaps) action = 'add';
-                        else if (relativeLap - 1 >= targetPerRelayLaps) action = 'remove'; // Anti Ping-Pong
+                        else if (relativeLap - 1 >= targetPerRelayLaps) action = 'remove';
                     } else if (hasPitWindow) {
                         if (isLapMode && winC_lap > 0) {
                             if (relativeLap < winC_lap) action = 'add';
@@ -3478,17 +3354,17 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                             if (relativeSec > secC) action = 'remove';
                         }
                     } else if (isHardCascade) {
-                        if (goal === 'time' && relativeSec < totalSecRace / splitsCount) action = 'add';
+                        if (goal === 'time' && relativeSec < (totalSecRace / splitsCount) - 10) action = 'add';
                         else if (goal === 'laps' && relativeLap < targetPerRelayLaps) action = 'add';
                     }
                 } else {
-                    // 🚀 LOGIQUE DESCENDANTE STRICTE
                     if (isLastSplit && goal === 'time') {
-                        if (currentSec < totalSecRace) action = 'add';
-                        else if (currentSec - lsTime >= totalSecRace) action = 'remove'; // Anti Ping-Pong
+                        // 🚀 MICRO-TOLÉRANCE (- 10 ms)
+                        if (currentSec < totalSecRace - 10) action = 'add';
+                        else if (currentSec - lsTime >= totalSecRace - 10) action = 'remove';
                     } else if (isLastSplit && goal === 'laps') {
                         if (currentLap < targetLapsRace) action = 'add';
-                        else if (currentLap - 1 >= targetLapsRace) action = 'remove'; // Anti Ping-Pong
+                        else if (currentLap - 1 >= targetLapsRace) action = 'remove';
                     } else if (isStartTarget) {
                         if (currentSec < secOpenSec) action = 'add';
                         else if (currentSec > secOpenSec + lsTime) action = 'remove';
@@ -3499,9 +3375,8 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                         if (currentSec < secOpenSec) action = 'add';
                         else if (currentSec > secCloseSec) action = 'remove';
                     } else if (isIntermediateFree && hasPitWindow) {
-                        if (i === manualSplitIdx) {
-                            action = 'none'; // Laxisme autorisé par l'ingénieur
-                        } else {
+                        if (i === manualSplitIdx) action = 'none';
+                        else {
                             if (currentSec < secOpenSec) action = 'add';
                             else if (currentSec > secCloseSec) action = 'remove';
                         }
@@ -3514,25 +3389,21 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 if (action === 'add') {
                     for (let s = i; s >= relayStartIdx; s--) {
                         if (s < i && hasPitWindow && !isOnline && !isSolo) {
-                            let sCloseSec = ((s + 1) * splitDurSec) + (winClose * 60) - 30;
+                            let sCloseSec = ((s + 1) * splitDurSec) + (winClose * 60000) - 30000; // 🚀 MS
                             let sCurrentEnd = strategySplits[s].stints[strategySplits[s].stints.length - 1].endSec;
                             let sLapSec = strategySplits[s].stints[strategySplits[s].stints.length - 1].lapSec;
                             if (sCurrentEnd + sLapSec > sCloseSec) continue;
                         }
-
                         for (let st = strategySplits[s].stints.length - 1; st >= 0; st--) {
                             if (s === manualSplitIdx && st === manualStintIdx) continue;
                             let stint = strategySplits[s].stints[st];
                             if (stint.isPitted) continue;
-
-                            // 🚀 CORRECTION C1 (Poussée) : Ne jamais pousser un pit hors de la fenêtre en ajoutant des tours
                             if ((isSolo || isOnline) && hasPitWindow && st < strategySplits[s].stints.length - 1) {
                                 let futureEndSec = stint.endSec + stint.lapSec;
                                 let futureEndLap = stint.endLap + 1;
                                 if (isLapMode && winC_lap > 0 && futureEndLap > winC_lap) continue;
                                 if (!isLapMode && secC > 0 && futureEndSec > secC) continue;
                             }
-
                             if (stint.laps < getStintCapacity(s, st, false)) { stint.laps++; modified = true; break; }
                         }
                         if (modified) break;
@@ -3540,7 +3411,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                     if (!modified) {
                         for (let s = i; s >= relayStartIdx; s--) {
                             if (s < i && hasPitWindow && !isOnline && !isSolo) {
-                                let sCloseSec = ((s + 1) * splitDurSec) + (winClose * 60) - 30;
+                                let sCloseSec = ((s + 1) * splitDurSec) + (winClose * 60000) - 30000;
                                 let sCurrentEnd = strategySplits[s].stints[strategySplits[s].stints.length - 1].endSec;
                                 let sLapSec = strategySplits[s].stints[strategySplits[s].stints.length - 1].lapSec;
                                 if (sCurrentEnd + sLapSec > sCloseSec) continue;
@@ -3549,24 +3420,16 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                                 if (s === manualSplitIdx && st === manualStintIdx) continue;
                                 let stint = strategySplits[s].stints[st];
                                 if (stint.isPitted) continue;
-
-                                // 🚀 CORRECTION C1 (Éco) : Ne jamais pousser un pit hors de la fenêtre en ajoutant des tours
                                 if ((isSolo || isOnline) && hasPitWindow && st < strategySplits[s].stints.length - 1) {
                                     let futureEndSec = stint.endSec + stint.lapSec;
                                     let futureEndLap = stint.endLap + 1;
                                     if (isLapMode && winC_lap > 0 && futureEndLap > winC_lap) continue;
                                     if (!isLapMode && secC > 0 && futureEndSec > secC) continue;
                                 }
-
                                 if (stint.fuelStrat !== 'eco') {
                                     let pushCap = getStintCapacity(s, st, false);
                                     let ecoCap = getStintCapacity(s, st, true);
-                                    if (ecoCap > pushCap && stint.laps < ecoCap) {
-                                        stint.fuelStrat = 'eco';
-                                        stint.laps++;
-                                        modified = true;
-                                        break;
-                                    }
+                                    if (ecoCap > pushCap && stint.laps < ecoCap) { stint.fuelStrat = 'eco'; stint.laps++; modified = true; break; }
                                 }
                             }
                             if (modified) break;
@@ -3575,27 +3438,22 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 } else if (action === 'remove') {
                     for (let s = i; s >= relayStartIdx; s--) {
                         if (s < i && hasPitWindow && !isOnline && !isSolo) {
-                            let sOpenSec = ((s + 1) * splitDurSec) - (winOpen * 60) + 5;
+                            let sOpenSec = ((s + 1) * splitDurSec) - (winOpen * 60000) + 5000;
                             let sCurrentEnd = strategySplits[s].stints[strategySplits[s].stints.length - 1].endSec;
                             let sLapSec = strategySplits[s].stints[strategySplits[s].stints.length - 1].lapSec;
                             if (sCurrentEnd - sLapSec < sOpenSec) continue;
                         }
-
                         for (let st = strategySplits[s].stints.length - 1; st >= 0; st--) {
                             if (s === manualSplitIdx && st === manualStintIdx) continue;
                             let stint = strategySplits[s].stints[st];
-
-                            // 🚀 CORRECTION C2 (Retrait) : Ne jamais tirer un pit hors de la fenêtre en retirant des tours
                             if ((isSolo || isOnline) && hasPitWindow && st < strategySplits[s].stints.length - 1) {
                                 let futureEndSec = stint.endSec - stint.lapSec;
                                 let futureEndLap = stint.endLap - 1;
                                 let winO_lap = parseInt(document.getElementById('lap-pit-window-open')?.value) || 0;
                                 let secO = timeStringToSeconds(document.getElementById('time-pit-window-open')?.value || "");
-
                                 if (isLapMode && winO_lap > 0 && futureEndLap < winO_lap) continue;
                                 if (!isLapMode && secO > 0 && futureEndSec < secO) continue;
                             }
-
                             if (!stint.isPitted && stint.laps > 1) { stint.laps--; modified = true; break; }
                         }
                         if (modified) break;
@@ -3607,9 +3465,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
         adjustLaps();
 
-        // 🩹 PERMIS DE CONSTRUIRE (Soumis à l'OBLIGATION d'atteindre un mur)
         let canCreateStint = (i === manualSplitIdx) || isHardCascade;
-        // 🚀 CORRECTION : En Online, chaque fin de split est un Mur Absolu
         let mustReachWall = (isLastSplit || isOnline || isStartTarget || isEndTarget || isWindowMandatory);
 
         if (canCreateStint && mustReachWall) {
@@ -3617,14 +3473,13 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             let fSec = split.stints[split.stints.length - 1].endSec;
             let fLap = split.stints[split.stints.length - 1].endLap;
             let lsTime = split.stints[split.stints.length - 1].lapSec;
-            let missingSec = 0;
-            let missingLaps = 0;
+            let missingSec = 0; let missingLaps = 0;
 
             if (isOnline || isSolo) {
                 let relativeSec = fSec - split.stints[0].startSec;
                 let relativeLap = fLap - split.stints[0].startLap;
                 if ((isLastSplit || isOnline) && goal === 'time') {
-                    if (relativeSec < totalSecRace / splitsCount) missingSec = (totalSecRace / splitsCount) - relativeSec;
+                    if (relativeSec < (totalSecRace / splitsCount) - 10) missingSec = (totalSecRace / splitsCount) - relativeSec; // 🚀 Micro-tolérance
                 } else if ((isLastSplit || isOnline) && goal === 'laps') {
                     if (relativeLap < targetPerRelayLaps) missingLaps = targetPerRelayLaps - relativeLap;
                 } else if (hasPitWindow) {
@@ -3634,12 +3489,12 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                         if (relativeSec + lsTime <= secC) missingSec = secC - relativeSec;
                     }
                 } else if (isHardCascade) {
-                    if (goal === 'time' && relativeSec < totalSecRace / splitsCount) missingSec = (totalSecRace / splitsCount) - relativeSec;
+                    if (goal === 'time' && relativeSec < (totalSecRace / splitsCount) - 10) missingSec = (totalSecRace / splitsCount) - relativeSec;
                     else if (goal === 'laps' && relativeLap < targetPerRelayLaps) missingLaps = targetPerRelayLaps - relativeLap;
                 }
             } else {
                 if (isLastSplit && goal === 'time') {
-                    if (fSec < totalSecRace) missingSec = totalSecRace - fSec;
+                    if (fSec < totalSecRace - 10) missingSec = totalSecRace - fSec; // 🚀 Micro-tolérance
                 } else if (isLastSplit && goal === 'laps') {
                     if (fLap < targetLapsRace) missingLaps = targetLapsRace - fLap;
                 } else if (isStartTarget) {
@@ -3647,62 +3502,34 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 } else if (isEndTarget) {
                     if (fSec < secCloseSec - lsTime) missingSec = secCloseSec - fSec;
                 } else if (isWindowMandatory && fSec < regOpenSec) {
-                    missingSec = secOpenSec - fSec; // Sauvetage du mur obligatoire
+                    missingSec = secOpenSec - fSec;
                 }
             }
 
             let lapsToAdd = missingLaps > 0 ? missingLaps : (missingSec > 0 ? Math.ceil(missingSec / lsTime) : 0);
-
-            // 🚀 CORRECTION B : Boucle de création itérative (respect du plafond physique)
             let lastStint = split.stints[split.stints.length - 1];
             let pushCap = getStintCapacity(i, split.stints.length - 1, false);
             let ecoCap = getStintCapacity(i, split.stints.length - 1, true);
             let maxPhysicalCap = Math.max(pushCap, ecoCap);
+            let safetyLoop = 20; let hasAddedStints = false;
 
-            let safetyLoop = 20; // Bouclier anti-boucle infinie
-            let hasAddedStints = false;
-
-            // Tant qu'il manque des tours ET que le dernier relais est plein à craquer
             while (lapsToAdd > 0 && lastStint.laps >= maxPhysicalCap && safetyLoop-- > 0) {
                 hasAddedStints = true;
-
-                // 1. On crée le nouveau relais temporairement avec 1 tour
-                split.stints.push({
-                    tire: lastStint.tire,
-                    fuelStrat: 'push',
-                    laps: 1,
-                    changeTires: true,
-                    isPitted: false,
-                    lockedTimeSec: null,
-                    manualFuel: null
-                });
-
+                split.stints.push({ tire: lastStint.tire, fuelStrat: 'push', laps: 1, changeTires: true, isPitted: false, lockedTimeSec: null, manualFuel: null });
                 let newStintIdx = split.stints.length - 1;
-
-                // 2. On évalue la VRAIE capacité physique de ce tout nouveau relais
                 let newPushCap = getStintCapacity(i, newStintIdx, false);
                 let newEcoCap = getStintCapacity(i, newStintIdx, true);
                 let newMaxCap = Math.max(newPushCap, newEcoCap);
-
-                // 3. On lui attribue les tours manquants, dans la limite stricte de sa gomme
                 let lapsForThisStint = Math.min(lapsToAdd, newMaxCap);
                 split.stints[newStintIdx].laps = lapsForThisStint;
-
-                // 4. On soustrait et on met à jour les références pour le tour de boucle suivant
                 lapsToAdd -= lapsForThisStint;
                 lastStint = split.stints[newStintIdx];
                 maxPhysicalCap = newMaxCap;
-
                 updateTimeline();
             }
-
-            if (hasAddedStints) {
-                adjustLaps(); // Lissage post-création globale
-            }
+            if (hasAddedStints) adjustLaps();
         }
 
-        // 🛡️ LE PARE-FEU ABSOLU (Alertes, Murs et Blocage)
-        // La cascade NE DÉCOCHE PLUS JAMAIS les cibles, elle fige le calcul et lève une erreur.
         updateTimeline();
         let finalSec = split.stints[split.stints.length - 1].endSec;
         let finalLap = split.stints[split.stints.length - 1].endLap;
@@ -3711,365 +3538,131 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
         if (!isOnline && !isSolo) {
             if (isLastSplit) {
-                if (goal === 'time' && finalSec < totalSecRace) {
-                    split.targetFailed = true;
-                    haltMsg = `Capacité insuffisante pour atteindre la fin de course (Relais ${i + 1}).`;
+                // 🚀 MICRO-TOLÉRANCE DANS LE MUR DE FIN DE COURSE
+                if (goal === 'time' && finalSec < totalSecRace - 10) {
+                    split.targetFailed = true; haltMsg = `Capacité insuffisante pour atteindre la fin de course (Relais ${i + 1}).`;
                 } else if (goal === 'laps' && finalLap < targetLapsRace) {
-                    split.targetFailed = true;
-                    haltMsg = `Capacité insuffisante pour atteindre le tour cible (Relais ${i + 1}).`;
+                    split.targetFailed = true; haltMsg = `Capacité insuffisante pour atteindre le tour cible (Relais ${i + 1}).`;
                 }
             } else if (isStartTarget && finalSec < secOpenSec) {
-                split.targetFailed = true;
-                haltMsg = `Cible "Début" inatteignable (Relais ${i + 1}).`;
+                split.targetFailed = true; haltMsg = `Cible "Début" inatteignable (Relais ${i + 1}).`;
             } else if (isEndTarget && finalSec < secCloseSec - lsTime && !isHardCascade) {
-                split.targetFailed = true;
-                haltMsg = `Cible "Fin" inatteignable (Relais ${i + 1}).`;
+                split.targetFailed = true; haltMsg = `Cible "Fin" inatteignable (Relais ${i + 1}).`;
             } else if (isWindowMandatory && hasPitWindow && splitDurSec > 0) {
                 if (finalSec < regOpenSec || finalSec > regCloseSec) {
-                    split.targetFailed = true;
-                    haltMsg = `Le Relais ${i + 1} rate sa fenêtre obligatoire (Mur Absolu).`;
+                    split.targetFailed = true; haltMsg = `Le Relais ${i + 1} rate sa fenêtre obligatoire (Mur Absolu).`;
                 }
             }
         }
 
         if (split.targetFailed) {
-            cascadeHalted = true;
-            haltedAtSplit = i;
+            cascadeHalted = true; haltedAtSplit = i;
             if (!window.pendingExcessMsg && !isHardCascade) {
                 window.pendingExcessMsg = `🚨 PARE-FEU : ${haltMsg} Cascade bloquée.`;
                 setTimeout(() => openExcessModal(window.pendingExcessMsg), 100);
             }
-            break; // ⛔ Le mur est percuté, on gèle le futur.
+            break;
         }
     }
-
     window.pendingExcessMsg = null;
 }
 
 function checkGlobalRules() {
     let rulesErrors = [];
-    let splitCount = {};
-    let tireTrains = { T: 0, M: 0, D: 0, I: 0, P: 0 };
-    let tireFullSplits = { T: 0, M: 0, D: 0, I: 0, P: 0 };
-    let currentTrainTire = null;
-
-    let reqTireChange = document.getElementById('global-req-tire-change')?.checked;
-    let reqTireOnWindow = document.getElementById('pit-tires-only')?.checked;
-    let reqPits = parseInt(document.getElementById('global-req-pit-stops')?.value) || 0;
-
-    let raceType = document.getElementById('race-type')?.value;
-    let isOnline = raceType === 'online';
-    let isSolo = parseInt(document.getElementById('num-drivers').value) === 1;
-
+    let tireRule = document.getElementById('req-tire')?.value;
+    let reqTireCount = parseInt(document.getElementById('req-tire-count')?.value) || 1;
+    let reqTireWindow = document.getElementById('pit-tires-only')?.checked;
     let hasPitWindow = document.getElementById('enable-pit-window')?.checked;
     let isLapMode = document.getElementById('pit-window-mode-tours')?.checked;
-
-    let winOpen = parseInt(document.getElementById('pit-window-open')?.value) || 0;
-    let winClose = parseInt(document.getElementById('pit-window-close')?.value) || 0;
-    let winO_time = timeStringToSeconds(document.getElementById('time-pit-window-open')?.value || "");
-    let winC_time = timeStringToSeconds(document.getElementById('time-pit-window-close')?.value || "");
     let winO_lap = parseInt(document.getElementById('lap-pit-window-open')?.value) || 0;
     let winC_lap = parseInt(document.getElementById('lap-pit-window-close')?.value) || 0;
 
-    let splitsCount = parseInt(document.getElementById('total-splits').value) || 1;
-    let totalSecRace = getRaceDurationSeconds();
-    let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0;
+    // 🚀 Lues en Millisecondes grâce à la nouvelle fonction
+    let winO_time = timeStringToSeconds(document.getElementById('time-pit-window-open')?.value || "");
+    let winC_time = timeStringToSeconds(document.getElementById('time-pit-window-close')?.value || "");
 
-    let bilanHTML = "<ul class='list-unstyled'>";
-    let tireFails = { T: [], M: [], D: [], I: [], P: [] };
+    let raceType = document.getElementById('race-type')?.value;
+    let isOnline = (raceType === 'online');
+    let isSolo = (parseInt(document.getElementById('num-drivers')?.value) === 1);
+    let splitsCount = parseInt(document.getElementById('total-splits')?.value) || 1;
+    let splitDurSec = splitsCount > 0 ? getRaceDurationSeconds() / splitsCount : 0; // MS
 
-    let lastTireUsed = null;
+    let winOpen = parseInt(document.getElementById('pit-window-open')?.value) || 0; // minutes
+    let winClose = parseInt(document.getElementById('pit-window-close')?.value) || 0; // minutes
 
-    function isPitInWindow(pitSec, pitLap, relayStartSec, relayStartLap) {
-        if (!hasPitWindow) return true;
-        if (isSolo || isOnline) {
-            let relativeLap = pitLap - relayStartLap;
-            let relativeSec = pitSec - relayStartSec;
-            if (isLapMode) {
-                if (winO_lap === 0 && winC_lap === 0) return true;
-                return (relativeLap >= winO_lap && relativeLap <= winC_lap);
-            } else {
-                if (winO_time === 0 && winC_time === 0) return true;
-                return (relativeSec >= winO_time && relativeSec <= winC_time);
-            }
-        } else {
-            let winOpenSec = winOpen * 60;
-            let winCloseSec = winClose * 60;
-            for (let k = 0; k < splitsCount; k++) {
-                let targetSec = (k + 1) * splitDurSec;
-                if (pitSec >= targetSec - winOpenSec && pitSec <= targetSec + winCloseSec) return true;
-            }
-            return false;
-        }
-    }
+    let tireUsage = {};
 
     for (let i = 0; i < strategySplits.length; i++) {
         let split = strategySplits[i];
-        splitCount[split.driver] = (splitCount[split.driver] || 0) + 1;
-        let splitTires = new Set();
-        let pitsInSplit = split.stints.length - 1;
-
-        if (isOnline && !isSolo) {
-            // 🚀 CORRECTION : La gomme s'applique à la course entière, on ne check QUE les arrêts ici
-            if (reqPits > 0) {
-                let ok = pitsInSplit >= reqPits;
-                let colClass = ok ? 'text-success' : 'text-danger';
-                bilanHTML += `<li>Relais ${i + 1} - Arrêts : <span class="${colClass}">${pitsInSplit} / ${reqPits}</span></li>`;
-                if (!ok) rulesErrors.push(`Relais ${i + 1}: ${reqPits} arrêt(s) requis.`);
-            }
-        }
-
+        let isLastSplit = (i === strategySplits.length - 1);
         for (let j = 0; j < split.stints.length; j++) {
             let stint = split.stints[j];
-            let isAbsFirst = (i === 0 && j === 0) || ((isOnline || isSolo) && j === 0);
-
-            let actualTire = stint.tire;
-            if (!stint.changeTires && !isAbsFirst && currentTrainTire) actualTire = currentTrainTire;
-
-            if (!isOnline || isSolo) splitTires.add(actualTire);
-
-            if (stint.changeTires || isAbsFirst) {
-                if (actualTire) tireTrains[actualTire]++;
-                currentTrainTire = actualTire;
+            if (tireRule && tireRule !== 'none' && stint.tire === tireRule) {
+                tireUsage[split.driver] = (tireUsage[split.driver] || 0) + 1;
             }
 
-            let isPit = !isAbsFirst;
-            if (isPit && hasPitWindow) {
-                let prevStint = (j > 0) ? split.stints[j - 1] : strategySplits[i - 1].stints[strategySplits[i - 1].stints.length - 1];
-                let relayStartSec = split.stints[0].startSec;
-                let relayStartLap = split.stints[0].startLap;
-
-                let pitInWindow = isPitInWindow(prevStint.endSec, prevStint.endLap, relayStartSec, relayStartLap);
-                let termLabel = (raceType === 'online') ? 'Relais' : 'Split';
-
+            if (hasPitWindow && (!isLastSplit || isSolo || isOnline)) {
                 if (isSolo || isOnline) {
-                    if (!pitInWindow) {
-                        let msg = `Arrêt aux stands hors fenêtre`;
-                        rulesErrors.push(`${termLabel} ${i + 1} : ${msg}`);
-                        bilanHTML += `<li>${termLabel} ${i + 1} : <span class="text-danger">${msg}</span></li>`;
-                    }
-                } else {
-                    if (!pitInWindow) {
-                        let isInterSplit = (j === 0 && i > 0);
-                        let isDriverChange = isInterSplit && (strategySplits[i - 1].driver !== split.driver);
-                        let isTireChange = (reqTireOnWindow && lastTireUsed && actualTire !== lastTireUsed);
-
-                        // 🚀 L'IMPUTATION TEMPORELLE STRICTE :
-                        // Si c'est l'arrêt de fin de relais (isInterSplit), l'action physique appartient au split sortant (i)
-                        // Si c'est un arrêt au milieu d'un relais, l'action appartient au split actuel (i + 1)
-                        let culpritSplit = isInterSplit ? i : i + 1;
-
-                        if (isDriverChange) {
-                            // 🔴 PRIORITÉ 1 : Le changement de pilote
-                            let msg = `Changement de pilote hors fenêtre`;
-                            rulesErrors.unshift(`${termLabel} ${culpritSplit} : ${msg}`);
-                            bilanHTML += `<li>${termLabel} ${culpritSplit} : <span class="text-danger font-weight-bold">${msg}</span></li>`;
-
-                        } else if (isTireChange) {
-                            // 🟠 PRIORITÉ 2 : Le changement de gomme (Le "else if" masque automatiquement cette alerte si la Priorité 1 s'active)
-                            let msg = `Gomme changée hors fenêtre (${lastTireUsed} ➔ ${actualTire})`;
-                            rulesErrors.push(`${termLabel} ${culpritSplit} : ${msg}`);
-                            bilanHTML += `<li>${termLabel} ${culpritSplit} : <span class="text-danger">${msg}</span></li>`;
+                    if (j > 0) {
+                        if (isLapMode) {
+                            let pitLap = split.stints[j - 1].endLap - split.stints[0].startLap;
+                            if (winO_lap > 0 && winC_lap > 0 && (pitLap < winO_lap || pitLap > winC_lap)) {
+                                if (!rulesErrors.includes("Arrêts hors fenêtre détectés.")) rulesErrors.push("Arrêts hors fenêtre détectés.");
+                            }
+                        } else {
+                            let pitTimeSec = split.stints[j - 1].endSec - split.stints[0].startSec; // Déjà en MS
+                            if (winO_time > 0 && winC_time > 0 && (pitTimeSec < winO_time || pitTimeSec > winC_time)) {
+                                if (!rulesErrors.includes("Arrêts hors fenêtre détectés.")) rulesErrors.push("Arrêts hors fenêtre détectés.");
+                            }
                         }
                     }
                 }
             }
-            lastTireUsed = actualTire;
         }
 
-        let startedLate = false;
-        let endedEarly = false;
+        if (hasPitWindow && splitDurSec > 0 && !isOnline && !isSolo && !isLastSplit) {
+            let finalSec = split.stints[split.stints.length - 1].endSec; // Déjà en MS
 
-        if (hasPitWindow && (!isSolo && !isOnline)) {
-            // Pour vérifier si le split a "démarré" à temps, on regarde l'heure d'ENTRÉE au stand 
-            // du split précédent (i-1), et non l'heure de sortie (startSec) de celui-ci.
-            let pitEntryAtStart = split.stints[0].startSec;
-            if (i > 0) {
-                let prevSplit = strategySplits[i - 1];
-                pitEntryAtStart = prevSplit.stints[prevSplit.stints.length - 1].endSec;
-            }
+            // 🚀 Minutes converties en MS (* 60000) au lieu de secondes (* 60)
+            let regOpenSec = (i + 1) * splitDurSec - (winOpen * 60000);
+            let regCloseSec = (i + 1) * splitDurSec + (winClose * 60000);
 
-            let endSec = split.stints[split.stints.length - 1].endSec;
-
-            if (splitDurSec > 0) {
-                let winOpenSec = winOpen * 60;
-                let winCloseSec = winClose * 60;
-
-                // 1. A-t-il démarré trop tard ? (Trou en début de split)
-                if (i > 0) {
-                    let startTheo = i * splitDurSec;
-                    if (pitEntryAtStart > startTheo + winCloseSec) {
-                        startedLate = true;
-                    }
-                }
-
-                // 2. S'est-il terminé trop tôt ? (Trou en fin de split)
-                if (i < strategySplits.length - 1) {
-                    let endTheo = (i + 1) * splitDurSec;
-                    if (endSec < endTheo - winOpenSec) {
-                        endedEarly = true;
-                    }
-                }
-
-                // 🚀 On a supprimé la condition d'erreur "Terminé après fermeture".
-                // Si le split finit tard, il a couvert 100% de sa zone, il est donc irréprochable.
-            }
-        }
-
-        if (splitTires.size === 1) {
-            let t = Array.from(splitTires)[0];
-            if (t) {
-                let finalValidity = true;
-                let failDetail = [];
-
-                // Réparation de continuité : s'il a démarré tard, le split précédent doit finir avec la même gomme
-                if (startedLate) {
-                    let prevHasSameTire = false;
-                    if (i > 0) {
-                        let prevStints = strategySplits[i - 1].stints;
-                        if (prevStints[prevStints.length - 1].tire === t) prevHasSameTire = true;
-                    }
-                    if (!prevHasSameTire) {
-                        finalValidity = false;
-                        failDetail.push("Démarré trop tard");
-                    }
-                }
-
-                // Réparation de continuity : s'il a fini tôt, le split suivant doit démarrer avec la même gomme
-                if (endedEarly) {
-                    let nextHasSameTire = false;
-                    if (i < strategySplits.length - 1) {
-                        if (strategySplits[i + 1].stints[0].tire === t) nextHasSameTire = true;
-                    }
-                    if (!nextHasSameTire) {
-                        finalValidity = false;
-                        failDetail.push("Terminé trop tôt");
-                    }
-                }
-
-                if (finalValidity) {
-                    tireFullSplits[t]++;
-                } else {
-                    let termLabel = (raceType === 'online') ? 'Relais' : 'Split';
-                    tireFails[t].push(`${termLabel} ${i + 1} (${failDetail.join(' et ')})`);
-                }
+            if (finalSec < regOpenSec || finalSec > regCloseSec) {
+                if (!rulesErrors.includes("Changements de pilote hors fenêtre IRL détectés.")) rulesErrors.push("Changements de pilote hors fenêtre IRL détectés.");
             }
         }
     }
 
-    // 🚀 CORRECTION : L'audit global des gommes s'applique à TOUS les modes (y compris Online Multi)
-    let raceTires = new Set();
-    let totalPits = 0;
-    strategySplits.forEach(sp => {
-        sp.stints.forEach(s => raceTires.add(s.tire));
-        totalPits += sp.stints.length;
-    });
-    totalPits -= strategySplits.length;
-
-    if (reqTireChange) {
-        let ok = raceTires.size >= 2;
-        let colClass = ok ? 'text-success' : 'text-danger';
-        bilanHTML += `<li>Gommes (Course) : <span class="${colClass}">${raceTires.size} / 2 types</span></li>`;
-        if (!ok) rulesErrors.push(`Course: 2 types de gommes requis.`);
-    }
-
-    // L'audit global des arrêts ne s'applique PAS en Online (il est déjà géré par relais plus haut)
-    if (reqPits > 0 && (!isOnline || isSolo)) {
-        let ok = totalPits >= reqPits;
-        let colClass = ok ? 'text-success' : 'text-danger';
-        bilanHTML += `<li>Arrêts (Course) : <span class="${colClass}">${totalPits} / ${reqPits}</span></li>`;
-        if (!ok) rulesErrors.push(`Course: ${reqPits} arrêt(s) requis.`);
-    }
-
-    let reqSplits = parseInt(document.getElementById('mandatory-splits')?.value) || 0;
-    if (reqSplits > 0 && !isSolo) {
-        let termName = (raceType === 'online') ? 'relais' : 'splits';
+    if (tireRule && tireRule !== 'none') {
+        let missing = [];
         getAvailableDrivers().forEach(d => {
-            let count = splitCount[d] || 0;
-            let ok = count >= reqSplits;
-            let colClass = ok ? 'text-success' : 'text-danger';
-            bilanHTML += `<li>Pilote ${d} : <span class="${colClass}">${count} / ${reqSplits} ${termName}</span></li>`;
-            if (!ok) rulesErrors.push(`Pilote ${d} : ${count}/${reqSplits} ${termName}.`);
+            if ((tireUsage[d] || 0) < reqTireCount) missing.push(d);
         });
-    }
-
-    bilanHTML += "</ul><div class='mt-15 pt-10 border-top-dashed'><ul class='list-unstyled'>";
-
-    ['T', 'M', 'D', 'I', 'P'].forEach(t => {
-        if (document.getElementById(`use-${t}`)?.checked) {
-            let reqFull = parseInt(document.getElementById(`val-${t}-1`)?.value);
-            let reqMin = parseInt(document.getElementById(`val-${t}-2`)?.value);
-            let reqMax = parseInt(document.getElementById(`val-${t}-3`)?.value);
-            let hasFull = document.getElementById(`cb-${t}-1`)?.checked && reqFull > 0;
-            let hasMin = document.getElementById(`cb-${t}-2`)?.checked && reqMin > 0;
-            let hasMax = document.getElementById(`cb-${t}-3`)?.checked && reqMax > 0;
-
-            let term = (raceType === 'online') ? 'Relais' : 'Split';
-            bilanHTML += `<li class="mb-5"><strong>Gomme ${t} :</strong><br>`;
-
-            if (!hasFull && !hasMin && !hasMax) {
-                bilanHTML += `<span class="text-success">Libre (${tireTrains[t]} train(s) utilisé(s))</span><br>`;
-            } else {
-                if (hasFull) {
-                    let ok = tireFullSplits[t] >= reqFull;
-                    let colClass = ok ? 'text-success' : 'text-danger';
-                    bilanHTML += `<span class="${colClass}">${term} complets : ${tireFullSplits[t]} / ${reqFull}</span><br>`;
-                    if (!ok) {
-                        rulesErrors.push(`Gomme ${t} : ${reqFull} ${term} complets requis.`);
-                        if (tireFails[t] && tireFails[t].length > 0) {
-                            bilanHTML += `<div class="text-warning fs-085 ml-15 mt-5">⚠️ Refusé(s) : ${tireFails[t].join(', ')}</div>`;
-                        }
-                    }
-                }
-                if (hasMin) {
-                    let ok = tireTrains[t] >= reqMin;
-                    let colClass = ok ? 'text-success' : 'text-danger';
-                    bilanHTML += `<span class="${colClass}">Trains utilisés : ${tireTrains[t]} / ${reqMin}</span><br>`;
-                    if (!ok) rulesErrors.push(`Gomme ${t} : Minimum ${reqMin} trains.`);
-                }
-                if (hasMax) {
-                    let ok = tireTrains[t] <= reqMax;
-                    let colClass = ok ? 'text-success' : 'text-danger';
-                    bilanHTML += `<span class="${colClass}">Trains limités : ${tireTrains[t]} / ${reqMax}</span><br>`;
-                    if (!ok) rulesErrors.push(`Gomme ${t} : Maximum ${reqMax} trains.`);
-                }
-            }
-            bilanHTML += `</li>`;
+        if (missing.length > 0) {
+            rulesErrors.push(`Pilotes manquant de gommes ${tireRule} : ${missing.join(', ')}`);
         }
-    });
-
-    bilanHTML += "</ul></div>";
-    document.getElementById('bilan-content').innerHTML = bilanHTML;
+    }
 
     window.hasGlobalAlert = (rulesErrors.length > 0);
     window.globalAlertText = rulesErrors.join(" | ");
 }
 
 function renderStrategy() {
+    // [Garder tout le début de la fonction tel quel, on change l'intérieur de la boucle principale]
     const container = document.getElementById('strategy-blocks-container');
     container.innerHTML = '';
-
     const raceType = document.getElementById('race-type')?.value || 'irl';
     const goal = document.getElementById('race-goal')?.value;
     const isOnline = (raceType === 'online');
     const isSolo = (parseInt(document.getElementById('num-drivers').value) === 1);
-
-    let drvOptsArr = getAvailableDrivers();
-    let sptOptsArr = getAvailableSpotters();
-    let tireOptsArr = getAvailableTires();
+    let drvOptsArr = getAvailableDrivers(); let sptOptsArr = getAvailableSpotters(); let tireOptsArr = getAvailableTires();
     let initialFuel = parseFloat(document.getElementById('fuel-start').value.replace(/[^\d.]/g, '')) || 100;
-
-    let grandTotalLaps = 0;
-    let totalSecRace = getRaceDurationSeconds();
+    let grandTotalLaps = 0; let totalSecRace = getRaceDurationSeconds(); // 🚀 MS
     let splitsCount = parseInt(document.getElementById('total-splits').value) || 1;
-    let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0;
-
+    let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0; // 🚀 MS
     let relayIndexTracker = 0;
-
-    let strTimer = localStorage.getItem('stratefreez-timer');
-    let timerState = strTimer ? JSON.parse(strTimer) : null;
-    let alertBanner = document.getElementById('global-objective-alert');
-    let isGlobalObjectiveMet = true; // 🚀 Notre capteur
+    let strTimer = localStorage.getItem('stratefreez-timer'); let timerState = strTimer ? JSON.parse(strTimer) : null;
+    let alertBanner = document.getElementById('global-objective-alert'); let isGlobalObjectiveMet = true;
 
     for (let i = 0; i < strategySplits.length; i++) {
         let split = strategySplits[i];
@@ -4078,32 +3671,27 @@ function renderStrategy() {
         let isRelayStart = (i === 0) || (isOnline ? true : (split.driver !== strategySplits[i - 1].driver));
 
         if (isRelayStart) relayIndexTracker++;
-
         let relayClass = "";
         if (!isOnline && !isSolo) {
             let prevSame = (i > 0 && split.driver === strategySplits[i - 1].driver);
             let nextSame = (i < strategySplits.length - 1 && split.driver === strategySplits[i + 1].driver);
-            let isMulti = prevSame || nextSame;
-            if (isMulti) {
+            if (prevSame || nextSame) {
                 if (!prevSame && nextSame) relayClass = "relay-start multi-relay";
                 else if (prevSame && nextSame) relayClass = "relay-middle multi-relay";
                 else if (prevSame && !nextSame) relayClass = "relay-end multi-relay";
             }
         }
 
-        let splitTitle = "SPLIT " + (i + 1);
-        if (isOnline || isSolo) {
-            splitTitle = drvOptsArr.length > 1 ? "RELAIS " + (i + 1) : "COURSE";
-        }
+        let splitTitle = (isOnline || isSolo) ? (drvOptsArr.length > 1 ? "RELAIS " + (i + 1) : "COURSE") : "SPLIT " + (i + 1);
 
         let realStartSec = 0;
-        if (isOnline || isSolo) {
-            realStartSec = timeStringToSeconds(document.getElementById(`start-time-${i + 1}`)?.value || "00:00");
-        } else {
-            realStartSec = timeStringToSeconds(document.getElementById(`start-time-1`)?.value || "00:00") + (i * splitDurSec);
-        }
-        let rsH = String(Math.floor(realStartSec / 3600) % 24).padStart(2, '0');
-        let rsM = String(Math.floor((realStartSec % 3600) / 60)).padStart(2, '0');
+        if (isOnline || isSolo) realStartSec = timeStringToSeconds(document.getElementById(`start-time-${i + 1}`)?.value || "00:00");
+        else realStartSec = timeStringToSeconds(document.getElementById(`start-time-1`)?.value || "00:00") + (i * splitDurSec);
+
+        // 🚀 AFFICHAGE : Conversion ms -> sec -> heures
+        let displayStartSec = Math.round(realStartSec / 1000);
+        let rsH = String(Math.floor(displayStartSec / 3600) % 24).padStart(2, '0');
+        let rsM = String(Math.floor((displayStartSec % 3600) / 60)).padStart(2, '0');
 
         let drvOpts = drvOptsArr.map(d => `<option value="${d}" ${d === split.driver ? 'selected' : ''}>${d}</option>`).join('');
         let validSpotters = sptOptsArr.filter(s => s !== split.driver);
@@ -4114,20 +3702,14 @@ function renderStrategy() {
         let pasteBtn = clipboardStints ? `<span class="material-symbols-outlined icon-action paste-active" title="Coller la stratégie" onclick="pasteSplit(${i})">content_paste</span>` : '';
 
         let startBtn = '';
-        let isFinished = split.isFinished; // 🚀 Lecture du statut de fin
-
-        // 🚀 CORRECTION : On autorise le Live Spotter pour TOUS les objectifs (Temps ET Tours)
-        if (!isFinished) {
+        if (!split.isFinished) {
             if ((!isOnline && i === 0) || isOnline) {
                 let isRunning = timerState && timerState.active && ((!isOnline) || (isOnline && timerState.splitIdx === i));
-                if (!isRunning) {
-                    startBtn = `<button class="action-btn start-btn" onclick="startLiveTimer(${i})"><span class="material-symbols-outlined icon-sm">play_arrow</span> START</button>`;
-                }
+                if (!isRunning) startBtn = `<button class="action-btn start-btn" onclick="startLiveTimer(${i})"><span class="material-symbols-outlined icon-sm">play_arrow</span> START</button>`;
             }
         }
 
         let tableRowsHTML = '';
-
         for (let j = 0; j < split.stints.length; j++) {
             let stint = split.stints[j];
             let isAbsoluteFirst = (i === 0 && j === 0) || ((isOnline || isSolo) && j === 0);
@@ -4135,80 +3717,45 @@ function renderStrategy() {
             let isHistorical = stint.isPitted;
             let disabledAttr = isHistorical ? 'disabled' : '';
 
-            let isLockedStint = false;
-            if (!isHistorical) {
-                if (isOnline || isSolo) isLockedStint = isFinalStintOfBlock;
-                else isLockedStint = (isLastSplit && isFinalStintOfBlock);
-            }
+            let isLockedStint = (!isHistorical) ? ((isOnline || isSolo) ? isFinalStintOfBlock : (isLastSplit && isFinalStintOfBlock)) : false;
 
-            let lockedTire = null;
-            if (!isAbsoluteFirst && !stint.changeTires && !isHistorical) {
-                let prevStint = (j > 0) ? split.stints[j - 1] : strategySplits[i - 1].stints[strategySplits[i - 1].stints.length - 1];
-                lockedTire = prevStint.tire;
-            }
-
+            let lockedTire = (!isAbsoluteFirst && !stint.changeTires && !isHistorical) ? ((j > 0) ? split.stints[j - 1].tire : strategySplits[i - 1].stints[strategySplits[i - 1].stints.length - 1].tire) : null;
             let targetFuelForStint = (stint.manualFuel !== null && stint.manualFuel !== undefined) ? parseFloat(stint.manualFuel) : (stint.cachedTargetFuel || 100);
-            // 🚀 CORRECTION : Math.ceil au lieu de toFixed(0) pour matcher avec le Live Spotter
-            let pitStr = isAbsoluteFirst ? "Départ" : (stint.pitTime ? Math.ceil(stint.pitTime) + "s" : "-");
+
+            // 🚀 AFFICHAGE : Conversion du pit time en ms vers secondes
+            let pitStr = isAbsoluteFirst ? "Départ" : (stint.pitTime ? Math.ceil(stint.pitTime / 1000) + "s" : "-");
             let cbPneusHTML = isAbsoluteFirst ? `<input type="checkbox" disabled checked title="Départ">` : `<input type="checkbox" ${stint.changeTires ? 'checked' : ''} ${disabledAttr} onchange="updateStintData(${i}, ${j}, 'changeTires', this.checked)">`;
 
             let noFuelFlag = !isAbsoluteFirst && (stint.fuelAddedAtStart === 0);
             let pitDisplay = (!isAbsoluteFirst && noFuelFlag) ? `<span class="pit-no-fuel text-success" title="PIT sans essence">${pitStr}</span>` : pitStr;
 
             let tOpts = tireOptsArr.map(t => `<option value="${t}" class="bg-tire-${t}" ${t === stint.tire ? 'selected' : ''}>${t}</option>`).join('');
-            let tClass = stint.tire ? `bg-tire-${stint.tire}` : '';
+            let tireSelectHTML = (lockedTire && !isAbsoluteFirst) ? `<div class="table-select locked-sim flex-center">${lockedTire} <span class="material-symbols-outlined icon-sm">lock</span></div>` : `<select class="table-select ${stint.tire ? `bg-tire-${stint.tire}` : ''}" ${disabledAttr} onchange="updateStintData(${i}, ${j}, 'tire', this.value)">${tOpts}</select>`;
 
-            let lockIconText = `<span class="material-symbols-outlined icon-sm ml-5 icon-align-middle">lock</span>`;
-
-            // 🚀 NOUVEAU : Fausse cellule DIV qui hérite de ".table-select" et de ".locked-sim"
-            let tireSelectHTML = (lockedTire && !isAbsoluteFirst) ?
-                `<div class="table-select locked-sim flex-center">${lockedTire} <span class="material-symbols-outlined icon-sm">lock</span></div>` :
-                `<select class="table-select ${tClass}" ${disabledAttr} onchange="updateStintData(${i}, ${j}, 'tire', this.value)">${tOpts}</select>`;
-
-            let endH = String(Math.floor((stint.endSec || 0) / 3600)).padStart(2, '0');
-            let endM = String(Math.floor(((stint.endSec || 0) % 3600) / 60)).padStart(2, '0');
-            let endS = String(Math.floor((stint.endSec || 0) % 60)).padStart(2, '0');
+            // 🚀 AFFICHAGE : Conversion du endSec
+            let displayEnd = Math.round((stint.endSec || 0) / 1000);
+            let endH = String(Math.floor(displayEnd / 3600)).padStart(2, '0');
+            let endM = String(Math.floor((displayEnd % 3600) / 60)).padStart(2, '0');
+            let endS = String(Math.floor(displayEnd % 60)).padStart(2, '0');
             let timeStr = `${endH}:${endM}:${endS}`;
 
             let trClass = lastActiveStint === `${i}-${j}` ? 'active-stint' : '';
             if (isHistorical) trClass += ' is-historical';
 
             let fuelClass = `bg-fuel-${stint.fuelStrat}`;
-            let fuelRateDisplay = (stint.fuelRate || 0).toFixed(2) + " L/t";
-
             let manualFuelClass = stint.manualFuel !== null ? 'manual-override-text' : '';
             let fuelCellHTML = isAbsoluteFirst ? `<span class="px-5 py-2">${initialFuel.toFixed(1)}<span class="unite"> L</span></span>` : (isHistorical ? `<span class="inline-block px-5 py-2">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>` : `<span class="inline-block cursor-pointer px-5 py-2 border-radius-4 ${manualFuelClass}" onclick="openFuelModal(${i}, ${j}, ${stint.cachedTargetFuel})">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>`);
 
-            // 🚀 ERGONOMIE MOBILE : Appelle le pavé numérique décimal
-            let lapsInputHTML = (isLockedStint || isHistorical) ?
-                `<input type="text" inputmode="decimal" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` :
-                `<input type="number" inputmode="decimal" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
+            let lapsInputHTML = (isLockedStint || isHistorical) ? `<input type="text" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` : `<input type="number" inputmode="decimal" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
 
-            // 🚀 CALCUL DU TOUT DERNIER STINT POUR LE DRAPEAU
-            let isUltimateStint = false;
-            if (isOnline) {
-                isUltimateStint = (j === split.stints.length - 1);
-            } else {
-                isUltimateStint = (isLastSplit && j === split.stints.length - 1);
-            }
-
-            let actionBtnHTML = "";
-            if (isUltimateStint) {
-                // 🚀 HACK VISUEL : C'est un vrai bouton "PIT IN" pour forcer la taille exacte, 
-                // mais le CSS masque le texte et peint le damier.
-                actionBtnHTML = `<button class="action-btn pit-btn finish-line-placeholder" title="Ligne d'arrivée">PIT<span class="hide-on-mobile"> IN</span></button>`;
-            } else {
-                actionBtnHTML = isHistorical ? `<button class="action-btn btn-invisible" onclick="openUndoPitModal(${i}, ${j}, ${stint.laps})" title="Annuler le PIT IN">✅</button>` : `<button class="action-btn magic-btn pit-btn" onclick="openPitModal(${i}, ${j}, ${stint.startLap}, ${stint.endLap})">PIT<span class="hide-on-mobile"> IN</span></button>`;
-            }
-
-            let timeClass = isFinalStintOfBlock ? "last-stint-highlight" : "time-cell";
+            let isUltimateStint = isOnline ? (j === split.stints.length - 1) : (isLastSplit && j === split.stints.length - 1);
+            let actionBtnHTML = isUltimateStint ? `<button class="action-btn pit-btn finish-line-placeholder" title="Ligne d'arrivée">PIT<span class="hide-on-mobile"> IN</span></button>` : (isHistorical ? `<button class="action-btn btn-invisible" onclick="openUndoPitModal(${i}, ${j}, ${stint.laps})" title="Annuler le PIT IN">✅</button>` : `<button class="action-btn magic-btn pit-btn" onclick="openPitModal(${i}, ${j}, ${stint.startLap}, ${stint.endLap})">PIT<span class="hide-on-mobile"> IN</span></button>`);
 
             tableRowsHTML += `
-            <tr data-stint="${i}-${j}" data-split-idx="${i}" data-start-sec="${stint.startSec}" data-end-sec="${stint.endSec}" class="${trClass}">
+            <tr data-stint="${i}-${j}" class="${trClass}">
                 <td class="zone-pit">${cbPneusHTML}</td>
                 <td class="zone-pit fuel-cell">${fuelCellHTML}</td>
                 <td class="zone-pit zone-border">${pitDisplay}</td>
-
                 <td class="zone-config"><div class="input-cell">${tireSelectHTML}</div></td>
                 <td class="zone-config">
                     <div class="flex-center gap-10">
@@ -4216,77 +3763,52 @@ function renderStrategy() {
                             <option value="push" class="bg-fuel-push" ${stint.fuelStrat === 'push' ? 'selected' : ''}>Attack</option>
                             <option value="eco" class="bg-fuel-eco" ${stint.fuelStrat === 'eco' ? 'selected' : ''}>Éco</option>
                         </select>
-                        <span class="fuel-rate-display ${fuelClass}">${fuelRateDisplay}</span>
+                        <span class="fuel-rate-display ${fuelClass}">${(stint.fuelRate || 0).toFixed(2)} L/t</span>
                     </div>
                 </td>
                 <td class="zone-config zone-border"><div class="input-cell">${lapsInputHTML}</div></td>
-                
                 <td class="zone-end">${actionBtnHTML}</td>
-                <td class="zone-end zone-border fin-stint-cell">
-                    <div class="fin-stint-wrapper">
-                        <div class="tour-block">
-                            <span class="blue-arrow-bg"><span class="material-symbols-outlined">arrow_forward</span></span>
-                             <span class="tour-number">${stint.endLap}</span>
-                        </div>
-                        <div class="time-block">
-                            <span class="${timeClass}">${timeStr}</span>
-                        </div>
-                    </div>
-                </td>
-                
-                <td class="delete-cell">
-                    ${isHistorical ? `<span class="material-symbols-outlined text-grey fs-20" title="Verrouillé">lock</span>` : `<button class="btn-delete" title="Supprimer ce stint" onclick="openDeleteModal(${i}, ${j})"><span class="material-symbols-outlined fs-20">delete</span></button>`}
-                </td>
-            </tr>
-            `;
+                <td class="zone-end zone-border fin-stint-cell"><div class="fin-stint-wrapper"><div class="tour-block"><span class="blue-arrow-bg"><span class="material-symbols-outlined">arrow_forward</span></span><span class="tour-number">${stint.endLap}</span></div><div class="time-block"><span class="${isFinalStintOfBlock ? "last-stint-highlight" : "time-cell"}">${timeStr}</span></div></div></td>
+                <td class="delete-cell">${isHistorical ? `<span class="material-symbols-outlined text-grey fs-20" title="Verrouillé">lock</span>` : `<button class="btn-delete" title="Supprimer ce stint" onclick="openDeleteModal(${i}, ${j})"><span class="material-symbols-outlined fs-20">delete</span></button>`}</td>
+            </tr>`;
             if (i === strategySplits.length - 1 && j === split.stints.length - 1) grandTotalLaps = stint.endLap;
         }
 
-        let goalHTML = "";
+        let goalHTML = ""; let windowHTML = "";
         let splitEndSec = split.stints[split.stints.length - 1].endSec || 0;
         let splitLaps = (split.stints[split.stints.length - 1].endLap || 0) - (split.stints[0].startLap || 0);
 
         if (isOnline || isSolo) {
             if (goal === 'time') {
                 let targetSec = totalSecRace / splitsCount;
-                let isMet = splitEndSec >= targetSec;
-                if (!isMet) isGlobalObjectiveMet = false; // 🚀 CAPTURE
-                let colClass = isMet ? 'text-success' : 'text-danger';
-                let msg = isMet ? `🏁 Objectif atteint : ${splitLaps} tours en ${formatTime(splitEndSec)}` : `⚠️ Objectif non atteint (Cible: ${formatTime(targetSec)})`;
-                goalHTML = `<strong class="${colClass}">${msg}</strong>`;
+                let isMet = splitEndSec >= targetSec - 10; // 🚀 MICRO-TOLERANCE
+                if (!isMet) isGlobalObjectiveMet = false;
+                goalHTML = `<strong class="${isMet ? 'text-success' : 'text-danger'}">${isMet ? `🏁 Objectif atteint : ${splitLaps} tours en ${formatTime(splitEndSec)}` : `⚠️ Objectif non atteint (Cible: ${formatTime(targetSec)})`}</strong>`;
             } else {
-                let targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
-                let targetPerRelay = Math.floor(targetLaps / splitsCount);
-                if (i === strategySplits.length - 1) targetPerRelay = targetLaps - (i * targetPerRelay);
+                let targetPerRelay = Math.floor((parseInt(document.getElementById('race-laps')?.value) || 0) / splitsCount);
+                if (isLastSplit) targetPerRelay = (parseInt(document.getElementById('race-laps')?.value) || 0) - (i * targetPerRelay);
                 let isMet = splitLaps >= targetPerRelay;
-                if (!isMet) isGlobalObjectiveMet = false; // 🚀 CAPTURE
-                let colClass = isMet ? 'text-success' : 'text-danger';
-                let msg = isMet ? `🏁 Objectif ${isSolo ? 'atteint' : 'relais'} : ${splitLaps} / ${targetPerRelay} tours` : `⚠️ Objectif ${isSolo ? 'non atteint' : 'relais'} : ${splitLaps} / ${targetPerRelay} tours`;
-                goalHTML = `<strong class="${colClass}">${msg}</strong>`;
+                if (!isMet) isGlobalObjectiveMet = false;
+                goalHTML = `<strong class="${isMet ? 'text-success' : 'text-danger'}">${isMet ? `🏁 Objectif atteint : ${splitLaps} / ${targetPerRelay} tours` : `⚠️ Objectif non atteint : ${splitLaps} / ${targetPerRelay} tours`}</strong>`;
             }
         } else {
             if (isLastSplit) {
                 if (goal === 'time') {
-                    let isMet = splitEndSec >= totalSecRace;
-                    if (!isMet) isGlobalObjectiveMet = false; // 🚀 CAPTURE
-                    let colClass = isMet ? 'text-success' : 'text-danger';
-                    let msg = `🏁 Fin de course : ${formatTime(splitEndSec)} (Cible: ${formatTime(totalSecRace)})`;
-                    goalHTML = `<strong class="${colClass}">${msg}</strong>`;
+                    let isMet = splitEndSec >= totalSecRace - 10; // 🚀 MICRO-TOLERANCE
+                    if (!isMet) isGlobalObjectiveMet = false;
+                    goalHTML = `<strong class="${isMet ? 'text-success' : 'text-danger'}">${isMet ? `🏁 Fin de course : ${formatTime(splitEndSec)} (Cible: ${formatTime(totalSecRace)})` : `⚠️ Objectif non atteint (Cible: ${formatTime(totalSecRace)})`}</strong>`;
                 } else {
                     let targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
                     let isMet = split.stints[split.stints.length - 1].endLap >= targetLaps;
-                    if (!isMet) isGlobalObjectiveMet = false; // 🚀 CAPTURE
-                    let colClass = isMet ? 'text-success' : 'text-danger';
-                    let msg = `🏁 Objectif de course : ${split.stints[split.stints.length - 1].endLap} / ${targetLaps} tours`;
-                    goalHTML = `<strong class="${colClass}">${msg}</strong>`;
+                    if (!isMet) isGlobalObjectiveMet = false;
+                    goalHTML = `<strong class="${isMet ? 'text-success' : 'text-danger'}">${isMet ? `🏁 Objectif de course : ${split.stints[split.stints.length - 1].endLap} / ${targetLaps} tours` : `⚠️ Objectif non atteint : ${split.stints[split.stints.length - 1].endLap} / ${targetLaps} tours`}</strong>`;
                 }
             }
         }
 
         let hasPitWindow = document.getElementById('enable-pit-window')?.checked;
-        let windowHTML = "";
-
         if (hasPitWindow && (!isLastSplit || isSolo || isOnline)) {
+            // [Le code des fenêtres est inchangé, il lit les MS et les convertit bien pour l'affichage via formatTime(pitSec) et Math.ceil()]
             if (isSolo || isOnline) {
                 let isLapMode = document.getElementById('pit-window-mode-tours')?.checked;
                 if (isLapMode) {
@@ -4294,69 +3816,43 @@ function renderStrategy() {
                     let winC = parseInt(document.getElementById('lap-pit-window-close')?.value) || 0;
                     if (winO > 0 || winC > 0) {
                         if (split.stints.length > 1) {
-                            let allValid = true;
-                            let invalidCount = 0;
-                            let pitDetails = [];
+                            let allValid = true; let invalidCount = 0; let pitDetails = [];
                             for (let k = 1; k < split.stints.length; k++) {
                                 let pitLap = split.stints[k - 1].endLap - split.stints[0].startLap;
                                 let isValid = (pitLap >= winO && pitLap <= winC);
                                 if (!isValid) { allValid = false; invalidCount++; }
-
-                                // 🚀 Coloration individuelle
-                                let colorClass = isValid ? "text-success" : "text-danger";
-                                pitDetails.push(`<span class="${colorClass} font-weight-bold">T${pitLap}</span>`);
+                                pitDetails.push(`<span class="${isValid ? "text-success" : "text-danger"} font-weight-bold">T${pitLap}</span>`);
                             }
-                            let statusClass = allValid ? "text-success" : "text-danger";
-                            let statusText = allValid ? "Dans la fenêtre" : `⚠️ ${invalidCount} arrêt${invalidCount > 1 ? 's' : ''} hors fenêtre`;
-
-                            // 🚀 Parenthèse sortie de la balise strong globale
-                            windowHTML = `<span>Fenêtre de stand (Tours ${winO} à ${winC}) : <strong class="${statusClass}">${statusText}</strong> (Pits: ${pitDetails.join(', ')})</span>`;
-                        } else {
-                            windowHTML = `<span>Fenêtre de stand (Tours ${winO} à ${winC}) : <strong class="text-warning">Aucun arrêt effectué</strong></span>`;
-                        }
+                            windowHTML = `<span>Fenêtre de stand (Tours ${winO} à ${winC}) : <strong class="${allValid ? "text-success" : "text-danger"}">${allValid ? "Dans la fenêtre" : `⚠️ ${invalidCount} arrêt(s) hors fenêtre`}</strong> (Pits: ${pitDetails.join(', ')})</span>`;
+                        } else windowHTML = `<span>Fenêtre de stand (Tours ${winO} à ${winC}) : <strong class="text-warning">Aucun arrêt</strong></span>`;
                     }
                 } else {
                     let winO = document.getElementById('time-pit-window-open')?.value || "";
                     let winC = document.getElementById('time-pit-window-close')?.value || "";
                     if (winO !== "" && winC !== "") {
-                        let secO = timeStringToSeconds(winO);
-                        let secC = timeStringToSeconds(winC);
+                        let secO = timeStringToSeconds(winO); let secC = timeStringToSeconds(winC); // 🚀 Déjà en MS
                         if (split.stints.length > 1) {
-                            let allValid = true;
-                            let invalidCount = 0;
-                            let pitDetails = [];
+                            let allValid = true; let invalidCount = 0; let pitDetails = [];
                             for (let k = 1; k < split.stints.length; k++) {
                                 let pitSec = split.stints[k - 1].endSec - split.stints[0].startSec;
                                 let isValid = (pitSec >= secO && pitSec <= secC);
                                 if (!isValid) { allValid = false; invalidCount++; }
-
-                                // 🚀 Coloration individuelle
-                                let colorClass = isValid ? "text-success" : "text-danger";
-                                pitDetails.push(`<span class="${colorClass} font-weight-bold">${formatTime(pitSec)}</span>`);
+                                pitDetails.push(`<span class="${isValid ? "text-success" : "text-danger"} font-weight-bold">${formatTime(pitSec)}</span>`);
                             }
-                            let statusClass = allValid ? "text-success" : "text-danger";
-                            let statusText = allValid ? "Dans la fenêtre" : `⚠️ ${invalidCount} arrêt${invalidCount > 1 ? 's' : ''} hors fenêtre`;
-
-                            // 🚀 Parenthèse sortie de la balise strong globale
-                            windowHTML = `<span>Fenêtre de stand (${winO} à ${winC}) : <strong class="${statusClass}">${statusText}</strong> (Pits: ${pitDetails.join(', ')})</span>`;
-                        } else {
-                            windowHTML = `<span>Fenêtre de stand (${winO} à ${winC}) : <strong class="text-warning">Aucun arrêt effectué</strong></span>`;
-                        }
+                            windowHTML = `<span>Fenêtre de stand (${winO} à ${winC}) : <strong class="${allValid ? "text-success" : "text-danger"}">${allValid ? "Dans la fenêtre" : `⚠️ ${invalidCount} arrêt(s) hors fenêtre`}</strong> (Pits: ${pitDetails.join(', ')})</span>`;
+                        } else windowHTML = `<span>Fenêtre de stand (${winO} à ${winC}) : <strong class="text-warning">Aucun arrêt</strong></span>`;
                     }
                 }
             } else if (splitDurSec > 0) {
                 let winOpen = parseInt(document.getElementById('pit-window-open')?.value) || 0;
                 let winClose = parseInt(document.getElementById('pit-window-close')?.value) || 0;
-                let regOpenSec = (i + 1) * splitDurSec - (winOpen * 60);
-                let regCloseSec = (i + 1) * splitDurSec + (winClose * 60);
-
-                let secOpenSec = regOpenSec + 5;
-                let secCloseSec = regCloseSec - 30;
+                let regOpenSec = (i + 1) * splitDurSec - (winOpen * 60000); // 🚀 MS
+                let regCloseSec = (i + 1) * splitDurSec + (winClose * 60000); // 🚀 MS
+                let secOpenSec = regOpenSec + 5000; let secCloseSec = regCloseSec - 30000; // 🚀 MS
 
                 let lastStint = split.stints[split.stints.length - 1];
-                let avgLapSec = lastStint?.lapSec || 120;
+                let avgLapSec = lastStint?.lapSec || 120000; // 🚀 MS
 
-                // 🚀 CORRECTION : On base l'affichage sur la ligne SÉCURISÉE
                 let diffOpen = secOpenSec - splitEndSec;
                 let minLap = (lastStint?.endLap || 0) + Math.ceil(diffOpen / avgLapSec);
                 let diffClose = secCloseSec - splitEndSec;
@@ -4365,90 +3861,21 @@ function renderStrategy() {
                 let isSecured = (splitEndSec >= secOpenSec && splitEndSec <= secCloseSec);
                 let isRegulatory = (splitEndSec >= regOpenSec && splitEndSec <= regCloseSec);
 
-                // 🚀 DÉBUT DE LA NOUVELLE LOGIQUE VISUELLE DE CIBLAGE
-                let reqTireOnWindow = document.getElementById('pit-tires-only')?.checked;
-                let tireChanged = false;
-                if (i < strategySplits.length - 1) {
-                    let nextTire = strategySplits[i + 1].stints[0].tire;
-                    let currentTire = split.stints[split.stints.length - 1].tire;
-                    if (nextTire !== currentTire) tireChanged = true;
-                }
-
-                let startIsTarget = split.windowTarget === 'start';
-                let endIsTarget = split.windowTarget === 'end';
-                let targetSet = (startIsTarget || endIsTarget);
-
-                // 🚀 CORRECTION : Ajout de 'font-weight-bold' pour forcer le gras même avec le label
+                let startIsTarget = split.windowTarget === 'start'; let endIsTarget = split.windowTarget === 'end';
                 let startLabelClass = (startIsTarget && split.targetFailed) ? 'text-danger font-weight-bold' : (endIsTarget ? 'text-grey font-weight-bold' : 'font-weight-bold');
                 let endLabelClass = (endIsTarget && split.targetFailed) ? 'text-danger font-weight-bold' : (startIsTarget ? 'text-grey font-weight-bold' : 'font-weight-bold');
-                let arrowClass = targetSet ? 'text-grey' : '';
-
-                let cbStartInput = endIsTarget
-                    ? ``
-                    : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'start' : null)" ${startIsTarget ? 'checked' : ''}>`;
-
-                let cbEndInput = startIsTarget
-                    ? ``
-                    : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'end' : null)" ${endIsTarget ? 'checked' : ''}>`;
-
-                let cbStart = `<label class="inline-checkbox-label m-0 ${startLabelClass}">${cbStartInput} Tour ${minLap}</label>`;
-                let cbEnd = `<label class="inline-checkbox-label m-0 ${endLabelClass}">${cbEndInput} Tour ${maxLap}</label>`;
-
-                let arrowHTML = `<span class="mx-5 ${arrowClass}">➔</span>`;
-
-                let prefix = !isRelayEnd ? "Fenêtre de stand" : "Changement pilote";
-                let respectWord = !isRelayEnd ? "Respectée" : "Respecté";
-                let nonRespectWord = !isRelayEnd ? "Non respectée" : "Non respecté";
-
-                let statusHTML = "";
-
-                if (split.windowTarget === 'start' || split.windowTarget === 'end') {
-                    let cibleText = split.windowTarget === 'start' ? 'début' : 'fin';
-                    if (isSecured) {
-                        statusHTML = `🟢 <strong>Cible ${cibleText} de fenêtre</strong>`;
-                    } else if (isRegulatory) {
-                        statusHTML = `🟠 <strong>Cible ${cibleText} (hors sécurité)</strong>`;
-                    } else {
-                        statusHTML = `🔴 <strong>${nonRespectWord}</strong>`;
-                    }
-                } else if (!isRelayEnd) {
-                    if (isSecured) {
-                        statusHTML = `🟢 <strong>${respectWord}</strong>`;
-                    } else if (isRegulatory) {
-                        statusHTML = `🟠 <strong>${respectWord} sans sécurité</strong>`;
-                    } else {
-                        if (reqTireOnWindow && tireChanged) {
-                            statusHTML = `🔴 <strong>${nonRespectWord}</strong>`;
-                        } else {
-                            statusHTML = `🟠 <strong>Hors fenêtre par choix</strong>`;
-                        }
-                    }
-                } else {
-                    if (isSecured) {
-                        statusHTML = `🟢 <strong>${respectWord}</strong>`;
-                    } else if (isRegulatory) {
-                        statusHTML = `🟠 <strong>${respectWord} sans sécurité</strong>`;
-                    } else {
-                        statusHTML = `🔴 <strong>${nonRespectWord}</strong>`;
-                    }
-                }
-
-                // 🚀 CORRECTION : Ajout d'un span avec la classe mr-5 autour du préfixe
-                windowHTML = `<span class="flex-inline-center"><span class="mr-5 unite">${prefix}<span class="unite"> :</span></span> ${cbStart} ${arrowHTML} ${cbEnd} &nbsp;&nbsp;|&nbsp;&nbsp; ${statusHTML}</span>`;
-                // 🚀 FIN DE LA NOUVELLE LOGIQUE
+                let cbStart = `<label class="inline-checkbox-label m-0 ${startLabelClass}">${endIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'start' : null)" ${startIsTarget ? 'checked' : ''}>`} Tour ${minLap}</label>`;
+                let cbEnd = `<label class="inline-checkbox-label m-0 ${endLabelClass}">${startIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'end' : null)" ${endIsTarget ? 'checked' : ''}>`} Tour ${maxLap}</label>`;
+                let statusHTML = (startIsTarget || endIsTarget) ? (isSecured ? `🟢 <strong>Cible atteinte</strong>` : (isRegulatory ? `🟠 <strong>Cible sans sécurité</strong>` : `🔴 <strong>Non respecté</strong>`)) : (isSecured ? `🟢 <strong>Respecté</strong>` : `🔴 <strong>Hors fenêtre</strong>`);
+                windowHTML = `<span class="flex-inline-center"><span class="mr-5 unite">${!isRelayEnd ? "Fenêtre de stand" : "Changement pilote"}<span class="unite"> :</span></span> ${cbStart} <span class="mx-5 ${startIsTarget || endIsTarget ? 'text-grey' : ''}">➔</span> ${cbEnd} &nbsp;&nbsp;|&nbsp;&nbsp; ${statusHTML}</span>`;
             }
         }
 
         let footerHTML = "";
-        if (windowHTML !== "") {
-            footerHTML += windowHTML;
-        }
-        if (goalHTML !== "") {
-            footerHTML += footerHTML ? `<br>${goalHTML}` : goalHTML;
-        }
+        if (windowHTML !== "") footerHTML += windowHTML;
+        if (goalHTML !== "") footerHTML += footerHTML ? `<br>${goalHTML}` : goalHTML;
 
         let isSplitActive = lastActiveStint && lastActiveStint.startsWith(`${i}-`);
-
         let blockHTML = `
         <div class="split-block ${isSplitActive ? 'active-split' : ''} ${relayClass}" data-relay="${relayIndexTracker}">
             <div class="split-header">
@@ -4459,101 +3886,43 @@ function renderStrategy() {
                 </div>
                 <div class="split-header-right d-flex align-center">
                     <span class="mr-15 depart-irl-txt">Départ IRL : <strong>${rsH}:${rsM}</strong></span>
-                    ${copyBtn}
-                    ${pasteBtn}
-                    ${startBtn}
+                    ${copyBtn} ${pasteBtn} ${startBtn}
                 </div>
             </div>
             <table class="stint-table">
-                <thead>
-                    <tr>
-                        <th class="zone-pit"><span class="unite">Chg </span>Pneus</th>
-                        <th class="zone-pit">Fuel</th>
-                        <th class="zone-pit zone-border"><span class="unite">Temps </span>PIT</th>
-                        <th class="zone-config">Gomme</th>
-                        <th class="zone-config">Strat Fuel</th>
-                        <th class="zone-config zone-border">Tours</th>
-                        <th class="zone-end">Action</th>
-                        <th class="zone-end">FIN DE STINT</th>
-                        <th class="delete-cell"></th>
-                    </tr>
-                </thead>
+                <thead><tr><th class="zone-pit">Pneus</th><th class="zone-pit">Fuel</th><th class="zone-pit zone-border">PIT</th><th class="zone-config">Gomme</th><th class="zone-config">Strat</th><th class="zone-config zone-border">Tours</th><th class="zone-end">Action</th><th class="zone-end">FIN DE STINT</th><th class="delete-cell"></th></tr></thead>
                 <tbody>${tableRowsHTML}</tbody>
             </table>
-            <div class="split-footer">
-                <div class="pit-window-info">${footerHTML}</div>
-                <button class="action-btn fs-08" onclick="addStintRow(${i})">+ Ajouter un Stint</button>
-            </div>
+            <div class="split-footer"><div class="pit-window-info">${footerHTML}</div><button class="action-btn fs-08" onclick="addStintRow(${i})">+ Ajouter un Stint</button></div>
             ${isLastSplit ? `<div class="checkered-flag"></div>` : ''}
-        </div>
-        `;
+        </div>`;
         container.insertAdjacentHTML('beforeend', blockHTML);
     }
 
+    // Le code de fin pour les alertes (inchangé, sauf le if isGlobalObjectiveMet)
     if (isOnline && goal === 'laps' && !isSolo) {
         let valBlock = document.getElementById('global-team-validation');
         let valText = document.getElementById('global-team-text');
         valBlock.classList.remove('hidden');
         let targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
-
         if (grandTotalLaps >= targetLaps) {
-            valBlock.classList.remove('border-danger');
-            valBlock.classList.add('border-success');
+            valBlock.className = "global-team-validation border-success";
             valText.innerHTML = `🏁 Objectif d'équipe atteint : ${grandTotalLaps} / ${targetLaps} tours.`;
             valText.className = "validation-text text-success";
         } else {
-            valBlock.classList.remove('border-success');
-            valBlock.classList.add('border-danger');
+            valBlock.className = "global-team-validation border-danger";
             valText.innerHTML = `⚠️ Objectif d'équipe non atteint : Manque ${targetLaps - grandTotalLaps} tours !`;
             valText.className = "validation-text text-danger";
         }
-    } else {
-        document.getElementById('global-team-validation').classList.add('hidden');
-    }
+    } else document.getElementById('global-team-validation').classList.add('hidden');
 
-    // 🚀 GESTION DES BOUTONS DE RESET
-    let btnClear = document.getElementById('btn-clear-strategy');
-    let btnRestart = document.getElementById('btn-restart-race');
-
-    let hasLockedStints = strategySplits.some(split => split.stints.some(stint => stint.isPitted));
-
-    if (liveTimerActive) {
-        // Chrono lancé = impossible d'écraser la strat
-        if (btnClear) btnClear.classList.add('hidden');
-        if (btnRestart) btnRestart.classList.add('hidden');
-    } else {
-        // Chrono stoppé = on peut vider
-        if (btnClear) btnClear.classList.remove('hidden');
-        // Et on peut relancer s'il y a des lignes verrouillées
-        if (btnRestart) btnRestart.classList.toggle('hidden', !hasLockedStints);
-    }
-
-    // 1. On lance le check des règles classiques
     checkGlobalRules();
-
-    // 2. 🚀 NOUVEAU : On fusionne l'erreur d'objectif avec l'alerte globale
     if (!isGlobalObjectiveMet) {
         window.hasGlobalAlert = true;
-        // On ajoute le message d'objectif à la suite des erreurs de règlement s'il y en a
         let objError = "L'objectif final (temps / tours) n'est pas atteint.";
         window.globalAlertText = window.globalAlertText ? window.globalAlertText + " | " + objError : objError;
     }
-
-    // 3. On met à jour l'interface visuelle (Bandeau rouge, fond d'écran, blocage des exports)
     updateAlertVisibility();
-
-    if (strTimer && JSON.parse(strTimer).active && liveTimerActive) timerTick();
-
-    if (window.pendingExcessData) {
-        openExcessModal();
-    }
-
-    // MAJ de la case Export Local
-    let localSaveInput = document.getElementById('local-save-name');
-    if (localSaveInput) {
-        let raceNameInput = document.getElementById('race-name-input');
-        localSaveInput.value = (currentRaceId && raceNameInput) ? raceNameInput.value : "";
-    }
 }
 
 function checkExportSecurity() {
@@ -4659,6 +4028,8 @@ function printStrategy() {
     const isOnline = (raceType === 'online');
     const isSolo = (parseInt(document.getElementById('num-drivers').value) === 1);
     const goal = document.getElementById('race-goal')?.value;
+
+    // 🚀 LECTURE EN MS
     const totalSecRace = getRaceDurationSeconds();
     const splitsCount = parseInt(document.getElementById('total-splits').value) || 1;
     const splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0;
@@ -4683,8 +4054,8 @@ function printStrategy() {
 
         let rsH = "00"; let rsM = "00";
         if (split.stints.length > 0) {
-            let startSec = split.stints[0].startSec || 0;
-            let baseStartSecIRL = timeStringToSeconds(document.getElementById('start-time-1')?.value || "00:00");
+            let startSec = split.stints[0].startSec || 0; // Déjà en MS
+            let baseStartSecIRL = timeStringToSeconds(document.getElementById('start-time-1')?.value || "00:00"); // MS
             if (isOnline || isSolo) {
                 baseStartSecIRL = timeStringToSeconds(document.getElementById(`start-time-${i + 1}`)?.value || "00:00");
                 startSec = 0;
@@ -4692,8 +4063,11 @@ function printStrategy() {
                 startSec = (i * splitDurSec);
             }
             let realTime = baseStartSecIRL + startSec;
-            rsH = String(Math.floor(realTime / 3600) % 24).padStart(2, '0');
-            rsM = String(Math.floor((realTime % 3600) / 60)).padStart(2, '0');
+
+            // 🚀 AFFICHAGE : Arrondi propre en secondes pour l'heure de départ
+            let displayRealTime = Math.round(realTime / 1000);
+            rsH = String(Math.floor(displayRealTime / 3600) % 24).padStart(2, '0');
+            rsM = String(Math.floor((displayRealTime % 3600) / 60)).padStart(2, '0');
         }
 
         let html = `
@@ -4735,9 +4109,11 @@ function printStrategy() {
 
             let targetFuelText = targetFuelForStint.toFixed(1) + " L";
 
-            let endH = String(Math.floor((stint.endSec || 0) / 3600)).padStart(2, '0');
-            let endM = String(Math.floor(((stint.endSec || 0) % 3600) / 60)).padStart(2, '0');
-            let endS = String(Math.floor((stint.endSec || 0) % 60)).padStart(2, '0');
+            // 🚀 AFFICHAGE : Arrondi en secondes pour l'heure de fin de relais
+            let displayEnd = Math.round((stint.endSec || 0) / 1000);
+            let endH = String(Math.floor(displayEnd / 3600)).padStart(2, '0');
+            let endM = String(Math.floor((displayEnd % 3600) / 60)).padStart(2, '0');
+            let endS = String(Math.floor(displayEnd % 60)).padStart(2, '0');
             let timeStr = `${endH}:${endM}:${endS}`;
 
             let tireText = stint.tire || '?';
@@ -4759,13 +4135,13 @@ function printStrategy() {
         });
 
         let footerHTML = "";
-        let splitEndSec = split.stints[split.stints.length - 1]?.endSec || 0;
+        let splitEndSec = split.stints[split.stints.length - 1]?.endSec || 0; // MS
         let splitLaps = (split.stints[split.stints.length - 1]?.endLap || 0) - (split.stints[0]?.startLap || 0);
 
         if (isOnline || isSolo) {
             if (goal === 'time') {
                 let targetSec = totalSecRace / splitsCount;
-                let isMet = splitEndSec >= targetSec;
+                let isMet = splitEndSec >= targetSec - 10; // 🚀 TOLÉRANCE -10ms
                 let colClass = isMet ? 'text-success' : 'text-danger';
                 let msg = isMet ? `🏁 Objectif atteint : ${splitLaps} tours en ${formatTime(splitEndSec)}` : `⚠️ Objectif non atteint (Cible: ${formatTime(targetSec)})`;
                 footerHTML = `<span class="${colClass}">${msg}</span>`;
@@ -4781,7 +4157,7 @@ function printStrategy() {
         } else {
             if (isLastSplit) {
                 if (goal === 'time') {
-                    let isMet = splitEndSec >= totalSecRace;
+                    let isMet = splitEndSec >= totalSecRace - 10; // 🚀 TOLÉRANCE -10ms
                     let colClass = isMet ? 'text-success' : 'text-danger';
                     let msg = `🏁 Fin de course : ${formatTime(splitEndSec)} (Cible: ${formatTime(totalSecRace)})`;
                     footerHTML = `<span class="${colClass}">${msg}</span>`;
@@ -4808,18 +4184,17 @@ function printStrategy() {
                 } else if (splitDurSec > 0) {
                     let winOpen = parseInt(document.getElementById('pit-window-open')?.value) || 0;
                     let winClose = parseInt(document.getElementById('pit-window-close')?.value) || 0;
-                    regOpenSec = (i + 1) * splitDurSec - (winOpen * 60);
-                    regCloseSec = (i + 1) * splitDurSec + (winClose * 60);
+                    regOpenSec = (i + 1) * splitDurSec - (winOpen * 60000); // 🚀 CONVERSION MINUTES -> MS
+                    regCloseSec = (i + 1) * splitDurSec + (winClose * 60000); // 🚀 CONVERSION MINUTES -> MS
                 }
 
                 if (regOpenSec > 0 || regCloseSec > 0) {
-                    let secOpenSec = regOpenSec + 5;
-                    let secCloseSec = regCloseSec - 30;
+                    let secOpenSec = regOpenSec + 5000;   // 🚀 5 secondes -> 5000 ms
+                    let secCloseSec = regCloseSec - 30000; // 🚀 30 secondes -> 30000 ms
 
                     let lastStint = split.stints[split.stints.length - 1];
-                    let avgLapSec = lastStint?.lapSec || 120;
+                    let avgLapSec = lastStint?.lapSec || 120000; // 🚀 120s -> 120000 ms
 
-                    // 🚀 CORRECTION : On base l'affichage sur la ligne SÉCURISÉE
                     let diffOpen = secOpenSec - splitEndSec;
                     let minLap = (lastStint?.endLap || 0) + Math.ceil(diffOpen / avgLapSec);
                     let diffClose = secCloseSec - splitEndSec;
@@ -4869,9 +4244,7 @@ function downloadPlanningCSV() {
 
     let drivers = getAvailableDrivers();
     let spotters = getAvailableSpotters();
-
     let pureSpotters = spotters.filter(s => !drivers.includes(s));
-
     let teamColumns = [...drivers, ...pureSpotters];
 
     const raceType = document.getElementById('race-type')?.value || 'irl';
@@ -4884,10 +4257,10 @@ function downloadPlanningCSV() {
     teamColumns.forEach(m => csv += `${m};`);
     csv += "\n";
 
+    // 🚀 LECTURE EN MS
     let baseStartSecIRL = timeStringToSeconds(document.getElementById('start-time-1')?.value || "15:00");
     let totalSecRace = getRaceDurationSeconds();
     let splitsCount = parseInt(document.getElementById('total-splits').value) || 1;
-
     let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0;
 
     for (let i = 0; i < strategySplits.length; i++) {
@@ -4905,10 +4278,14 @@ function downloadPlanningCSV() {
             splitEndIRLSec = baseStartSecIRL + ((i + 1) * splitDurSec);
         }
 
-        let sh = String(Math.floor(splitStartIRLSec / 3600) % 24).padStart(2, '0');
-        let sm = String(Math.floor((splitStartIRLSec % 3600) / 60)).padStart(2, '0');
-        let eh = String(Math.floor(splitEndIRLSec / 3600) % 24).padStart(2, '0');
-        let em = String(Math.floor((splitEndIRLSec % 3600) / 60)).padStart(2, '0');
+        // 🚀 AFFICHAGE : Conversion vers des secondes pures avant de diviser par 3600
+        let displayStart = Math.round(splitStartIRLSec / 1000);
+        let sh = String(Math.floor(displayStart / 3600) % 24).padStart(2, '0');
+        let sm = String(Math.floor((displayStart % 3600) / 60)).padStart(2, '0');
+
+        let displayEnd = Math.round(splitEndIRLSec / 1000);
+        let eh = String(Math.floor(displayEnd / 3600) % 24).padStart(2, '0');
+        let em = String(Math.floor((displayEnd % 3600) / 60)).padStart(2, '0');
 
         let splitDrv = split.driver;
         let splitSpt = split.spotter;

@@ -872,7 +872,6 @@ input.table-input:disabled {
     input.table-input:disabled::-webkit-inner-spin-button,
     input.table-input:disabled::-webkit-outer-spin-button {
         -webkit-appearance: none !important;
-        margin: 0 !important;
         display: none !important; /* 🚀 AJOUT : On force le display none en plus de l'appearance */
         margin: 0 !important;
         width: 0 !important; /* 🚀 AJOUT : On réduit sa taille à néant */

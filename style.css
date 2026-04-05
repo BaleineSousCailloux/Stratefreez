@@ -1071,7 +1071,7 @@ select:disabled, input:disabled, .locked-sim {
    5. SPÉCIFIQUE ONGLET 4 (Live Spotter)
    ============================================================ */
 #live-offline-msg {
-    z-index: 70;
+    z-index: 40;
     position: fixed;
     top: 78px;
     left: 0;

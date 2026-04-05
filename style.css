@@ -818,7 +818,7 @@ input[type="number"]::-webkit-outer-spin-button {
    SURBRILLANCE DU RELAIS EN COURS (MODE HAUTE VISIBILITÉ)
    ============================================================ */
 .active-live-stint td {
-    background-color: rgba(37, 253, 233, 0.1) !important;
+    background-color: rgba(37, 253, 233, 0.15) !important;
 }
 
 .active-live-stint {
@@ -830,15 +830,15 @@ input[type="number"]::-webkit-outer-spin-button {
 /* Moteur A : Juste la couleur de fond (pour toute la ligne) */
 @keyframes pulse-turquoise {
     0% {
-        box-shadow: inset 4px 0 0 #25fde9, inset 0 0 8px rgba(37, 253, 233, 0.1);
+        box-shadow: inset 2px 0 0 #25fde9, inset 0 0 8px rgba(37, 253, 233, 0.15);
     }
 
     50% {
-        box-shadow: inset 4px 0 0 #25fde9, inset 0 0 24px rgba(37, 253, 233, 0.6);
+        box-shadow: inset 10px 0 0 #25fde9, inset 0 0 20px rgba(37, 253, 233, 0.7);
     }
 
     100% {
-        box-shadow: inset 4px 0 0 #25fde9, inset 0 0 8px rgba(37, 253, 233, 0.1);
+        box-shadow: inset 2px 0 0 #25fde9, inset 0 0 8px rgba(37, 253, 233, 0.15);
     }
 }
 

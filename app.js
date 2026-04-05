@@ -4182,7 +4182,7 @@ function renderStrategy() {
 
             // 🚀 ERGONOMIE MOBILE : Appelle le pavé numérique décimal
             let lapsInputHTML = (isLockedStint || isHistorical) ?
-                `<input type="number" inputmode="decimal" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` :
+                `<input type="text" inputmode="decimal" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` :
                 `<input type="number" inputmode="decimal" class="table-input" value="${stint.laps}" onchange="updateStintData(${i}, ${j}, 'laps', this.value)">`;
 
             // 🚀 CALCUL DU TOUT DERNIER STINT POUR LE DRAPEAU

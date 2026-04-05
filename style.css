@@ -847,7 +847,7 @@ input[type="number"]::-webkit-outer-spin-button {
     opacity: 0.6;
 }
 
-/* Fix Input & Verrouillages Tableau */
+/* Fix général pour les champs numériques désactivés de l'application */
 input[type="number"]:disabled {
     -moz-appearance: textfield !important;
     appearance: none !important;
@@ -860,28 +860,17 @@ input[type="number"]:disabled {
 }
 
 /* 🚀 STYLE : Case de tours verrouillée (Dernier stint / Relais online) */
+/* Grâce au JS, cette case est un type="text" : adieu les flèches parasites ! */
 input.table-input:disabled {
+    background-color: #222 !important; /* Fond sombre */
     border: 2px solid #cc2d53 !important; /* Bordure rouge vif */
     color: #ff5252 !important; /* Chiffre rouge pour l'alerte */
+    cursor: not-allowed !important; /* Curseur "interdit" */
+    opacity: 1 !important;
+    width: 100% !important;
     font-weight: bold;
-    /* 🛡️ SOLUTION LOGIQUE : On force l'apparence "textfield" pour détruire le slot interne */
-    -webkit-appearance: none !important;
-    -moz-appearance: textfield !important;
-    appearance: none !important;
-    /* On retire tout padding résiduel à droite qui pourrait laisser voir le fond gris */
-    padding-right: 2px !important;
     text-align: center;
 }
-
-    /* 🖥️ NETTOYAGE COMPLET des résidus internes pour Chrome/Edge/Safari */
-    input.table-input:disabled::-webkit-inner-spin-button,
-    input.table-input:disabled::-webkit-outer-spin-button,
-    input.table-input:disabled::-webkit-clear-button,
-    input.table-input:disabled::-webkit-search-cancel-button {
-        -webkit-appearance: none !important;
-        display: none !important;
-        margin: 0 !important;
-    }
 
 /* Fuel Cell (Tableau) */
 .fuel-cell {

@@ -2123,7 +2123,7 @@ svg.live-grey-icon {
         }
 
         50% {
-            box-shadow: inset 0 8px 25px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
+            box-shadow: inset 0 7px 20px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
         }
     }
 
@@ -2133,19 +2133,17 @@ svg.live-grey-icon {
         }
 
         50% {
-            box-shadow: inset 0 -8px 25px rgba(37, 253, 233, 0.5); /* Halo qui déborde élégamment */
+            box-shadow: inset 0 -7px 20px rgba(37, 253, 233, 0.5); /* Halo qui déborde élégamment */
         }
     }
 
     @keyframes only-bar-turquoise {
         0%, 100% {
-            /*background-color: rgba(37, 253, 233, 0.05);*/
             background-size: 1px 100%; /* La barre fait 1px de large */
         }
 
         50% {
-            /*background-color: rgba(37, 253, 233, 0.25);*/
-            background-size: 30px 100%; /* La barre s'étire sur 30px vers la gauche */
+            background-size: 34px 100%; /* La barre s'étire sur 30px vers la gauche */
         }
     }
 

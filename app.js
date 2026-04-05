@@ -4043,7 +4043,6 @@ function checkGlobalRules() {
 
     window.hasGlobalAlert = (rulesErrors.length > 0);
     window.globalAlertText = rulesErrors.join(" | ");
-    updateAlertVisibility();
 }
 
 function renderStrategy() {
@@ -4529,26 +4528,31 @@ function renderStrategy() {
         if (btnRestart) btnRestart.classList.toggle('hidden', !hasLockedStints);
     }
 
+    // 1. On lance le check des règles classiques
     checkGlobalRules();
+
+    // 2. 🚀 NOUVEAU : On fusionne l'erreur d'objectif avec l'alerte globale
+    if (!isGlobalObjectiveMet) {
+        window.hasGlobalAlert = true;
+        // On ajoute le message d'objectif à la suite des erreurs de règlement s'il y en a
+        let objError = "L'objectif final (temps / tours) n'est pas atteint.";
+        window.globalAlertText = window.globalAlertText ? window.globalAlertText + " | " + objError : objError;
+    }
+
+    // 3. On met à jour l'interface visuelle (Bandeau rouge, fond d'écran, blocage des exports)
+    updateAlertVisibility();
 
     if (strTimer && JSON.parse(strTimer).active && liveTimerActive) timerTick();
 
     if (window.pendingExcessData) {
         openExcessModal();
     }
-    // 🚀 MAJ de la case Export Local
+
+    // MAJ de la case Export Local
     let localSaveInput = document.getElementById('local-save-name');
     if (localSaveInput) {
         let raceNameInput = document.getElementById('race-name-input');
         localSaveInput.value = (currentRaceId && raceNameInput) ? raceNameInput.value : "";
-    }
-    // 🚀 AFFICHAGE DU BANDEAU ROUGE
-    if (alertBanner) {
-        if (isGlobalObjectiveMet) {
-            alertBanner.classList.add('hidden');
-        } else {
-            alertBanner.classList.remove('hidden');
-        }
     }
 }
 

@@ -797,10 +797,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSnapshotDropdown();
         listenToCloudRace(); // 🚀 AJOUT ICI : Relance l'écoute après un F5
 
-        // 🚀 PASSEPORT : Vérification au rafraîchissement (F5)
+        // 🚀 SÉCURITÉ : Même si on a le passeport, on arrive TOUJOURS en spectateur au F5.
+        // Cela stabilise la connexion avant d'autoriser l'écriture (Cadenas Rouge).
         let hasPassport = localStorage.getItem(`stratefreez-passport-${currentRaceId}`) === 'true';
-        isEngineerMode = hasPassport; // On déverrouille direct si on a le passeport
-        toggleObserverMode(!isEngineerMode);
+        isEngineerMode = false;
+        toggleObserverMode(true);
 
         // Focus intelligent : On force l'onglet 3 si on était sur les paramétrages au moment du crash
         let savedTab = localStorage.getItem('stratefreez-current-tab') || 'tab-strategy';
@@ -1088,17 +1089,17 @@ async function confirmSwitchRace() {
 
     document.getElementById('switch-race-modal').classList.add('hidden');
 
-    // 1. On purge la course locale actuelle
+    // 1. On purge la course locale actuelle (isEngineerMode devient false ici)
     clearCurrentRaceData();
 
     // 2. On configure les identifiants
     currentRaceId = pendingSwitchRaceId;
     localStorage.setItem('stratefreez-current-race-id', currentRaceId);
 
-    // 🚀 PASSEPORT : On vérifie si l'appareil a DÉJÀ les droits pour cette course
-    let hasPassport = localStorage.getItem(`stratefreez-passport-${currentRaceId}`) === 'true';
-    isEngineerMode = hasPassport;
-    toggleObserverMode(!isEngineerMode);
+    // 🚀 SÉCURITÉ : On arrive TOUJOURS en mode spectateur (Bouclier actif)
+    // Même si on a le passeport, on ne l'active pas tout de suite pour éviter de polluer le Cloud au chargement.
+    isEngineerMode = false;
+    toggleObserverMode(true);
 
     // 3. TÉLÉCHARGEMENT INITIAL DEPUIS LE CLOUD
     try {
@@ -1111,25 +1112,24 @@ async function confirmSwitchRace() {
             localStorage.setItem('stratefreez-current-race-pin', currentRacePin);
             localStorage.setItem('stratefreez-is-race-active', isRaceActive);
 
-            // On applique les données du Cloud à l'application
             if (data.strategyData && data.strategyData.length > 0) {
                 strategySplits = data.strategyData;
                 localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
             } else {
-                strategySplits = []; // 🚀 S'assure de vider la mémoire
-                initStrategyData();  // 🚀 Reconstruit le squelette vierge pour l'onglet 3
+                strategySplits = [];
+                initStrategyData();
             }
             if (data.formState) applyFormStateToDOM(data.formState);
 
             updatePinDisplay();
             renderStrategy();
 
-            // 🚀 4. ON BRANCHE L'ÉCOUTE EN TEMPS RÉEL
+            // 4. ON BRANCHE L'ÉCOUTE EN TEMPS RÉEL
             listenToCloudRace();
 
             openTab('tab-strategy');
         } else {
-            alert("Cette course n'existe plus sur le serveur.");
+            showErrorModal("Cette course n'existe plus sur le serveur.");
             clearCurrentRaceData();
             openTab('tab-params');
         }

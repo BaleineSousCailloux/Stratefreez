@@ -1718,6 +1718,7 @@ function bindGlobalSyncEvents() {
 
 function startLiveTimer(splitIdx) {
     if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
+    if (liveTimerActive) return; // 🚀 PROTECTION ANTI DOUBLE-CLIC
 
     // 🛡️ PRE-FLIGHT CHECK (Vérification vitale avant départ)
     let tires = getAvailableTires();
@@ -3631,9 +3632,9 @@ function checkGlobalRules() {
     // 🚀 INJECTION DANS LA MODALE
     if (!isGlobalObjectiveMet) {
         rulesErrors.push("L'objectif final (temps/tours) n'est pas couvert par la stratégie");
-        bilanHTML += `<li class="mb-10 pb-10 border-bottom-dashed"><strong class="text-danger">⚠️ Objectif global non atteint</strong><br><span class="fs-09 text-grey-dark">La stratégie actuelle ne couvre pas la cible définie (Voir blocs ci-dessous).</span></li>`;
+        bilanHTML += `<li class="mb-10 pb-10 border-bottom-dashed"><strong class="text-danger">⚠️ Objectif global (temps / tours) non atteint</strong></li>`;
     } else {
-        bilanHTML += `<li class="mb-10 pb-10 border-bottom-dashed"><strong class="text-success">🏁 Objectif global sécurisé</strong></li>`;
+        bilanHTML += `<li class="mb-10 pb-10 border-bottom-dashed"><strong class="text-success">🏁 Objectif global (temps / tours) atteint</strong></li>`;
     }
 
     let tireFails = { T: [], M: [], D: [], I: [], P: [] };

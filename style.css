@@ -2050,7 +2050,7 @@ svg.live-grey-icon {
 /* Style commun aux deux alertes d'orientation */
 #portrait-overlay, #landscape-overlay {
     display: none;
-    z-index: 60;
+    z-index: 10000;
     position: fixed; /* 🚀 Indispensable pour supprimer le scroll */
     top: 0;
     left: 0;

@@ -864,6 +864,8 @@ input.table-input:disabled {
     border: 2px solid #cc2d53 !important; /* Bordure rouge vif */
     color: #ff5252 !important; /* Chiffre rouge pour l'alerte */
     font-weight: bold;
+    /* On s'assure que le champ ne réserve pas d'espace pour les boutons */
+    display: block;
 }
 
     /* Bloc spécifique pour cacher les flèches sur Chrome/Edge/Safari (PC) */
@@ -871,6 +873,10 @@ input.table-input:disabled {
     input.table-input:disabled::-webkit-outer-spin-button {
         -webkit-appearance: none !important;
         margin: 0 !important;
+        display: none !important; /* 🚀 AJOUT : On force le display none en plus de l'appearance */
+        margin: 0 !important;
+        width: 0 !important; /* 🚀 AJOUT : On réduit sa taille à néant */
+        height: 0 !important;
     }
 
 /* Fuel Cell (Tableau) */
@@ -1072,14 +1078,12 @@ select:disabled, input:disabled, .locked-sim {
    ============================================================ */
 .live-offline-msg {
     position: fixed;
-    top: 78px;
+    top: 128px;
     left: 0;
     right: 0;
     bottom: 0;
     background-color: #1e1e1e;
     text-align: center;
-    margin-top: 60px;
-    padding: 15px;
 }
 
 .icon-huge-grey {
@@ -2358,7 +2362,7 @@ svg.live-grey-icon {
     }
 
     .live-offline-msg {
-        margin-top: 0 !important;
+        top: 70px;
         padding: 10px;
     }
 }

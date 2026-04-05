@@ -40,7 +40,7 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 9999;
+    z-index: 11111;
     box-shadow: 0 4px 10px rgba(0,0,0,0.5);
 }
 
@@ -1070,9 +1070,15 @@ select:disabled, input:disabled, .locked-sim {
 /* ============================================================
    5. SPÉCIFIQUE ONGLET 4 (Live Spotter)
    ============================================================ */
-.live-offline-msg {
+#live-offline-msg {
+    z-index: 70;
+    position: fixed;
+    top: 78px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     text-align: center;
-    margin-top: 80px;
+    margin-top: 35px;
 }
 
 .icon-huge-grey {
@@ -2044,7 +2050,7 @@ svg.live-grey-icon {
    🚀 MODES STRICTS (Onglets 3 et 4 sur Mobile)
    ============================================================ */
 /* Style commun aux deux alertes d'orientation */
-.portrait-overlay, .landscape-overlay {
+#portrait-overlay, #landscape-overlay {
     display: none;
     z-index: 60;
     position: fixed; /* 🚀 Indispensable pour supprimer le scroll */

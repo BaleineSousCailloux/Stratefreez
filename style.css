@@ -2124,13 +2124,13 @@ svg.live-grey-icon {
     /* 3. L'animation de l'épaisseur et du halo des barres */
     @keyframes pulse-lines {
         0%, 100% {
-            height: 2px;
+            /*height: 2px;*/
             box-shadow: 0 0 5px rgba(37, 253, 233, 0.15);
         }
 
         50% {
-            height: 10px; /* La barre s'épaissit vers l'intérieur */
-            box-shadow: 0 0 15px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
+            /*height: 10px; La barre s'épaissit vers l'intérieur */
+            box-shadow: 0 0 25px rgba(37, 253, 233, 0.6); /* Halo qui déborde élégamment */
         }
     }
 }

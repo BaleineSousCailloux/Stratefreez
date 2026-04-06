@@ -1160,24 +1160,41 @@ function listenToCloudRace() {
             }
             // 🚀 3 RÉCEPTION DU MESSAGE FLASH
             if (data.currentMessage && data.currentMessage.text) {
-                let msgAge = getUnifiedTime() - data.currentMessage.timestamp;
+                const now = getUnifiedTime();
+                const msgAge = now - data.currentMessage.timestamp;
+                const remainingTime = 45000 - msgAge;
 
-                if (msgAge < 45000) { // Moins de 45s = VIVANT
+                if (remainingTime > 0) {
                     isFlashMessageAlive = true;
                     let overlay = document.getElementById('flash-alert-overlay');
                     let textEl = document.getElementById('flash-alert-text');
 
-                    // On affiche si le texte est nouveau
                     if (textEl.innerText !== data.currentMessage.text) {
                         textEl.innerText = data.currentMessage.text;
                         overlay.classList.remove('hidden');
                     }
-                } else { // Plus de 45s = PÉRIMÉ
+
+                    // ⏱️ AUTO-FERMETURE LOCALE : 
+                    // On programme la disparition et le retour du bouton au millième de seconde près
+                    clearTimeout(window.flashTimeout);
+                    window.flashTimeout = setTimeout(() => {
+                        isFlashMessageAlive = false;
+                        document.getElementById('flash-alert-overlay').classList.add('hidden');
+                        document.getElementById('flash-alert-text').innerText = "";
+                        evaluateFlashButtonState(); // Force le bouton à revenir
+
+                        // Nettoyage Cloud par l'ingénieur
+                        if (isEngineerMode) {
+                            db.collection('races').doc(currentRaceId).update({
+                                currentMessage: firebase.firestore.FieldValue.delete()
+                            }).catch(e => { });
+                        }
+                    }, remainingTime);
+
+                } else {
+                    // Message déjà expiré à l'arrivée
                     isFlashMessageAlive = false;
                     document.getElementById('flash-alert-overlay').classList.add('hidden');
-                    document.getElementById('flash-alert-text').innerText = "";
-
-                    // L'ingénieur nettoie la base de données pour tout le monde
                     if (isEngineerMode) {
                         db.collection('races').doc(currentRaceId).update({
                             currentMessage: firebase.firestore.FieldValue.delete()
@@ -1187,9 +1204,7 @@ function listenToCloudRace() {
             } else {
                 isFlashMessageAlive = false;
                 document.getElementById('flash-alert-overlay')?.classList.add('hidden');
-                document.getElementById('flash-alert-text').innerText = "";
             }
-
             evaluateFlashButtonState(); // Re-vérifie la bulle après réception
             // 4. MISE À JOUR STRATÉGIE (Seulement si on ne tape pas)
             if (data.strategyData && !isTyping) {

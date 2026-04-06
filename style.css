@@ -196,7 +196,7 @@ body {
     align-items: center;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    border: 1px solid #000;
+    border: none;
     box-sizing: border-box;
     color: #000;
     background: #fff;
@@ -212,7 +212,7 @@ body {
     justify-content: center;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    border: 1px solid #fff;
+    border: none;
     box-sizing: border-box;
 }
 
@@ -1662,7 +1662,7 @@ select:disabled, input:disabled, .locked-sim {
 
 #flash-alert-text {
     color: #ff9800;
-    font-size: 8vw; /* Texte adaptatif énorme */
+    font-size: 9vw; /* Texte adaptatif énorme */
     font-weight: 900;
     text-align: center;
     text-transform: uppercase;
@@ -1671,6 +1671,12 @@ select:disabled, input:disabled, .locked-sim {
     max-width: 90%;
     word-wrap: break-word;
     animation: pulseFlash 1.5s infinite ease-in-out;
+}
+/* Sécurité pour le mode paysage (PC et Mobile) */
+@media (orientation: landscape) {
+    #flash-alert-text {
+        font-size: 9vh; /* Utilise la hauteur au lieu de la largeur pour éviter l'écrasement */
+    }
 }
 
 @keyframes pulseFlash {

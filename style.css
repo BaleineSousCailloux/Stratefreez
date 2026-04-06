@@ -2108,7 +2108,7 @@ select:disabled, input:disabled, .locked-sim {
 }
 
 .icon-navbar {
-    font-size: 24px;
+    font-size: 24px !important;
 }
 
 .icon-sm {

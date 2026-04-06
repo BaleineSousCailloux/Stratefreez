@@ -160,19 +160,6 @@ document.addEventListener('click', function (e) {
 // ==========================================
 // --- SAUVEGARDE & STATUS ---
 // ==========================================
-/*function setSaveBadge(isSaved) {
-    const badge = document.getElementById('save-status-badge');
-    if (!badge) return;
-    if (isSaved) {
-        badge.classList.remove('unsaved');
-        badge.classList.add('saved');
-        badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock</span>';
-    } else {
-        badge.classList.remove('saved');
-        badge.classList.add('unsaved');
-        badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
-    }
-}*/
 
 function saveFormState() {
     if (window.isInitializingDOM) return;
@@ -698,7 +685,7 @@ function toggleObserverMode(isLocked) {
         if (!currentRaceId) {
             badge.classList.remove('unsaved');
             badge.classList.add('saved');
-            badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
+            badge.innerHTML = '<span class="material-symbols-outlined icon-navbar">lock_open</span>';
             badge.title = "Accueil - Prêt à créer";
             return; // On s'arrête là
         }
@@ -706,12 +693,12 @@ function toggleObserverMode(isLocked) {
         if (isLocked) {
             badge.classList.remove('saved');
             badge.classList.add('unsaved'); // 🔴 Rouge : Verrouillé (Observateur / Serrure fermée)
-            badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock</span>';
+            badge.innerHTML = '<span class="material-symbols-outlined icon-navbar">lock</span>';
             badge.title = "Mode Observateur - Cliquer pour déverrouiller";
         } else {
             badge.classList.remove('unsaved');
             badge.classList.add('saved'); // 🟢 Vert : Ouvert (Ingénieur / Serrure ouverte)
-            badge.innerHTML = '<span class="material-symbols-outlined icon-sm">lock_open</span>';
+            badge.innerHTML = '<span class="material-symbols-outlined icon-navbar">lock_open</span>';
             badge.title = "Mode Ingénieur Actif - Cliquer pour verrouiller";
         }
     }

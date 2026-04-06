@@ -864,6 +864,12 @@ function clearCurrentRaceData() {
     document.getElementById('form-tech').reset();
     strategySplits = [];
 
+    // 🚀 ÉTAPE 0.5 : ON TUE LE MESSAGE FLASH LOCAL (Empêche le blocage du bouton en changeant de course)
+    isFlashMessageAlive = false;
+    clearTimeout(window.flashTimeout);
+    let flashOverlay = document.getElementById('flash-alert-overlay');
+    if (flashOverlay) flashOverlay.classList.add('hidden');
+
     // 🚀 FERMETURE DES MENUS FANTÔMES (Onglets 1 & 2)
     toggleSpotters();
     togglePitWindowUI();
@@ -1795,11 +1801,10 @@ function startLiveTimer(splitIdx) {
     };
     localStorage.setItem('stratefreez-timer', JSON.stringify(timerState));
 
-    updateLiveStandbyState(); // Masque le bouton immédiatement
-
+    runTimerLoop();             // 1. On allume le moteur en premier (liveTimerActive devient true)
+    updateLiveStandbyState();   // 2. Maintenant l'écran voit que ça tourne et se cache !
     saveFormState();
     renderStrategy();
-    runTimerLoop();
 
     // 🚀 NOUVEAU : On court-circuite l'attente de 800ms pour envoyer le chrono IMMÉDIATEMENT au Cloud
     // Cela empêche le rafraîchissement local d'écraser le chrono avant qu'il ne soit sauvegardé !
@@ -2353,12 +2358,53 @@ function toggleStintFuelStrat(i, j) {
 }
 function openFuelModal(i, j, calcValue) {
     if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
-    fuelModalTarget = { i, j };
-    document.getElementById('fuel-modal-calc').innerText = calcValue.toFixed(1);
+
+    // 1. Calcul du Résiduel via la variable 'residualAtEnd' déjà calculée par votre cascade
+    let residual = 0;
+    if (j > 0) {
+        residual = strategySplits[i].stints[j - 1].residualAtEnd || 0;
+    } else if (i > 0) {
+        let prevSplit = strategySplits[i - 1];
+        if (prevSplit.stints && prevSplit.stints.length > 0) {
+            residual = prevSplit.stints[prevSplit.stints.length - 1].residualAtEnd || 0;
+        }
+    }
+
+    fuelModalTarget = { i, j, targetFuel: calcValue, residual: residual };
+
     let currentManual = strategySplits[i].stints[j].manualFuel;
-    document.getElementById('fuel-modal-input').value = (currentManual !== null && currentManual !== undefined) ? currentManual : '';
+    let hasManual = (currentManual !== null && currentManual !== undefined);
+
+    // 2. Affichage Ligne 1 (Résiduel) - Masqué uniquement sur le tout premier relais
+    let resLine = document.getElementById('fuel-modal-residual');
+    if (i === 0 && j === 0) {
+        resLine.classList.add('hidden');
+    } else {
+        resLine.innerText = `Résiduel : ${residual.toFixed(1)} L`;
+        resLine.classList.remove('hidden');
+    }
+
+    // 3. Affichage Ligne 2 (État Actuel)
+    let stateLine = document.getElementById('fuel-modal-state');
+    if (hasManual) {
+        stateLine.innerHTML = `Modifié : <span class="fuel-highlight text-warning">${currentManual.toFixed(1)} L</span>`;
+    } else {
+        if (calcValue <= residual) {
+            stateLine.innerHTML = `Calculé : <span class="text-success">${calcValue.toFixed(1)} L</span>`;
+        } else {
+            stateLine.innerHTML = `Calculé : <span class="text-warning">${calcValue.toFixed(1)} L</span>`;
+        }
+    }
+
+    // 4. Initialisation du champ et du bouton
+    let input = document.getElementById('fuel-modal-input');
+    input.value = ''; // On part sur un champ vide
+    document.getElementById('btn-fuel-validate').disabled = true; // Toujours grisé à l'ouverture
+    // 🚀 L'état du bouton est dicté par la logique centralisée
+    checkFuelInput();
+
     document.getElementById('fuel-modal').classList.remove('hidden');
-    setTimeout(() => { document.getElementById('fuel-modal-input').focus(); }, 50);
+    setTimeout(() => { input.focus(); }, 50);
 }
 
 function closeFuelModal() {
@@ -2368,24 +2414,43 @@ function closeFuelModal() {
 
 function confirmFuelOverride() {
     if (fuelModalTarget) {
-        let val = document.getElementById('fuel-modal-input').value;
-        strategySplits[fuelModalTarget.i].stints[fuelModalTarget.j].manualFuel = (val === '' || isNaN(val)) ? null : parseFloat(val);
-        cascadeFixPitWindows();
-        saveFormState();
-        renderStrategy();
-        if (liveTimerActive) timerTick(); // 🚀 NOUVEAU : Met à jour le Spotter instantanément
-        closeFuelModal();
+        let val = parseFloat(document.getElementById('fuel-modal-input').value);
+        // Ultime sécurité avant sauvegarde
+        if (!isNaN(val) && val > fuelModalTarget.residual && val > fuelModalTarget.targetFuel) {
+            strategySplits[fuelModalTarget.i].stints[fuelModalTarget.j].manualFuel = val;
+            cascadeFixPitWindows();
+            saveFormState();
+            renderStrategy();
+            if (liveTimerActive) timerTick();
+            closeFuelModal();
+        }
     }
 }
 
 function clearFuelOverride() {
+    // Fonction exclusive au bouton "Auto"
     if (fuelModalTarget) {
         strategySplits[fuelModalTarget.i].stints[fuelModalTarget.j].manualFuel = null;
         cascadeFixPitWindows();
         saveFormState();
         renderStrategy();
-        if (liveTimerActive) timerTick(); // 🚀 NOUVEAU : Met à jour le Spotter instantanément
+        if (liveTimerActive) timerTick();
         closeFuelModal();
+    }
+}
+
+// 🚀 LE GARDE-FOU (Appelé uniquement lors de la frappe dans la modale)
+function checkFuelInput() {
+    let btnValidate = document.getElementById('btn-fuel-validate');
+    let val = parseFloat(document.getElementById('fuel-modal-input').value);
+
+    if (fuelModalTarget) {
+        // Règle stricte : > Résiduel ET > Cible calculée
+        if (!isNaN(val) && val > fuelModalTarget.residual && val > fuelModalTarget.targetFuel) {
+            btnValidate.disabled = false; // Allume le bouton
+        } else {
+            btnValidate.disabled = true;  // Grise le bouton
+        }
     }
 }
 

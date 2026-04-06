@@ -575,7 +575,23 @@
         </div>
     </div>
     <div id="undo-pit-modal" class="modal hidden"><div class="modal-content border-top-success"><h3 class="modal-title-green">⏪ ANNULER LE PIT IN</h3><p>Combien de tours aviez-vous prévu de faire initialement ?</p><input type="number" id="undo-pit-modal-lap" class="modal-input-large" onkeydown="if(event.key==='Enter'){confirmUndoPit();}"><div class="justify-space-around d-flex"><button class="action-btn btn-grey" onclick="closeUndoPitModal()">Annuler</button><button class="action-btn btn-success" onclick="confirmUndoPit()">DÉVERROUILLER</button></div></div></div>
-    <div id="fuel-modal" class="modal hidden"><div class="modal-content border-top-warning"><h3>⛽ MODIFIER LE CARBURANT</h3><p class="mb-5">Calculé : <strong id="fuel-modal-calc" class="text-success fs-1-2"></strong> L</p><input type="number" id="fuel-modal-input" step="0.1" class="modal-input-fuel" onkeydown="if(event.key==='Enter'){confirmFuelOverride();}"><div class="modal-btn-group mt-25"><button class="action-btn btn-grey" onclick="clearFuelOverride()">Auto</button><button class="action-btn btn-warning" onclick="confirmFuelOverride()">VALIDER</button></div></div></div>
+    <div id="fuel-modal" class="modal hidden">
+        <div class="modal-content border-top-warning">
+            <h3>⛽ MODIFIER LE CARBURANT</h3>
+
+            <p id="fuel-modal-residual" class="text-grey fs-09 mt-10 mb-0 hidden"></p>
+
+            <p id="fuel-modal-state" class="fs-1-1 mt-5 mb-15"></p>
+
+            <input type="number" id="fuel-modal-input" step="0.1" class="modal-input-fuel" inputmode="decimal" placeholder="Nouvelle valeur..." oninput="checkFuelInput()" onkeydown="if(event.key==='Enter' && !document.getElementById('btn-fuel-validate').disabled){confirmFuelOverride();}">
+
+            <div class="modal-btn-group mt-25">
+                <button class="action-btn btn-grey" onclick="closeFuelModal()">Annuler</button>
+                <button class="action-btn btn-danger" onclick="clearFuelOverride()" title="Revenir au calcul automatique">Auto</button>
+                <button id="btn-fuel-validate" class="action-btn btn-warning" onclick="confirmFuelOverride()" disabled>VALIDER</button>
+            </div>
+        </div>
+    </div>
     <div id="delete-modal" class="modal hidden"><div class="modal-content border-top-danger"><p class="modal-confirm-text">Supprimer cette ligne ?</p><div class="modal-btn-group mt-20"><button class="action-btn btn-grey" onclick="closeDeleteModal()">Annuler</button><button class="action-btn btn-danger" onclick="confirmDeleteRow()">SUPPRIMER</button></div></div></div>
     <div id="clear-modal" class="modal hidden"><div class="modal-content border-top-danger"><p class="modal-confirm-text">🗑️ Vider le tableau</p><div class="modal-btn-group mt-20"><button class="action-btn btn-grey" onclick="closeClearModal()">Annuler</button><button class="action-btn btn-danger" onclick="confirmClearStrategy()">CONFIRMER</button></div></div></div>
     <div id="bilan-modal" class="modal hidden"><div class="modal-content border-top-success modal-wide"><p class="modal-confirm-text">📋 CHECK RÉGLEMENTATION</p><div id="bilan-content" class="bilan-content-box"></div><div class="d-flex justify-center mt-20"><button class="action-btn btn-grey" onclick="closeBilanModal()">Fermer</button></div></div></div>

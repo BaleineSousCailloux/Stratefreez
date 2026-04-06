@@ -40,7 +40,7 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 11111;
+    z-index: 7777;
     box-shadow: 0 4px 10px rgba(0,0,0,0.5);
 }
 
@@ -392,6 +392,14 @@ input[type="number"]::-webkit-outer-spin-button {
 
     .action-btn:hover {
         background: #444;
+    }
+
+    /* Rend visuellement inactifs tous les boutons qui portent l'attribut 'disabled' */
+    .action-btn:disabled {
+        opacity: 0.4 !important;
+        pointer-events: none !important;
+        cursor: not-allowed !important;
+        filter: grayscale(100%);
     }
 
 .magic-btn {

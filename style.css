@@ -212,20 +212,20 @@ body {
     justify-content: center;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    border: none;
+    border: 1px solid #ff5252 !important;
     box-sizing: border-box;
 }
 
     .save-badge.unsaved {
         background: #ff5252;
         color: #fff;
-        border-color: #ff5252;
+        border-color: #ff5252 !important;
     }
 
     .save-badge.saved {
         background: #4CAF50;
         color: #fff;
-        border-color: #4CAF50;
+        border-color: #4CAF50 !important;
     }
 
 /* --- Bannières d'alerte globales --- */

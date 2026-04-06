@@ -2387,7 +2387,7 @@ function openFuelModal(i, j, calcValue) {
     // 3. Affichage Ligne 2 (État Actuel)
     let stateLine = document.getElementById('fuel-modal-state');
     if (hasManual) {
-        stateLine.innerHTML = `Modifié : <span class="fuel-highlight text-warning">${currentManual.toFixed(1)} L</span>`;
+        stateLine.innerHTML = `Modifié : <span class="manual-override-text text-warning">${currentManual.toFixed(1)} L</span>`;
     } else {
         if (calcValue <= residual) {
             stateLine.innerHTML = `Calculé : <span class="text-success">${calcValue.toFixed(1)} L</span>`;

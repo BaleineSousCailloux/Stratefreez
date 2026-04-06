@@ -17,6 +17,7 @@ let lastActiveStint = localStorage.getItem('lastActiveStint') || null;
 // 🚀 NOUVEAU : Empreinte d'état (Remplace le boolean needsStrategyUpdate)
 let lastCalculatedState = null;
 let liveStandbyTimeout = null;
+let isFlashMessageAlive = false; // Permet au chrono de savoir si un message bloque la zone
 
 // ==========================================
 // --- NOUVEAU : HORLOGE ATOMIQUE (0 Quota) ---
@@ -715,6 +716,7 @@ function toggleObserverMode(isLocked) {
         }
     }
     updatePinDisplay();
+    evaluateFlashButtonState(); // 🚀 Affiche/Masque la bulle selon le cadenas
 }
 
 function handlePadlockClick() {
@@ -1152,7 +1154,7 @@ function listenToCloudRace() {
             // 1. SÉCURITÉ DE SAISIE (Empêche le clavier de se fermer)
             let activeEl = document.activeElement;
             let isTyping = activeEl && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName);
-            // 4. SYNCHRO DU CHRONO 🚀
+            // 2. SYNCHRO DU CHRONO 🚀
             let localTimerStr = localStorage.getItem('stratefreez-timer');
             let localTimer = localTimerStr ? JSON.parse(localTimerStr) : null;
 
@@ -1169,7 +1171,40 @@ function listenToCloudRace() {
                     stopTimer(false, true);
                 }
             }
-            // 2. MISE À JOUR STRATÉGIE (Seulement si on ne tape pas)
+            // 🚀 3 RÉCEPTION DU MESSAGE FLASH
+            if (data.currentMessage && data.currentMessage.text) {
+                let msgAge = getUnifiedTime() - data.currentMessage.timestamp;
+
+                if (msgAge < 45000) { // Moins de 45s = VIVANT
+                    isFlashMessageAlive = true;
+                    let overlay = document.getElementById('flash-alert-overlay');
+                    let textEl = document.getElementById('flash-alert-text');
+
+                    // On affiche si le texte est nouveau
+                    if (textEl.innerText !== data.currentMessage.text) {
+                        textEl.innerText = data.currentMessage.text;
+                        overlay.classList.remove('hidden');
+                    }
+                } else { // Plus de 45s = PÉRIMÉ
+                    isFlashMessageAlive = false;
+                    document.getElementById('flash-alert-overlay').classList.add('hidden');
+                    document.getElementById('flash-alert-text').innerText = "";
+
+                    // L'ingénieur nettoie la base de données pour tout le monde
+                    if (isEngineerMode) {
+                        db.collection('races').doc(currentRaceId).update({
+                            currentMessage: firebase.firestore.FieldValue.delete()
+                        }).catch(e => { });
+                    }
+                }
+            } else {
+                isFlashMessageAlive = false;
+                document.getElementById('flash-alert-overlay')?.classList.add('hidden');
+                document.getElementById('flash-alert-text').innerText = "";
+            }
+
+            evaluateFlashButtonState(); // Re-vérifie la bulle après réception
+            // 4. MISE À JOUR STRATÉGIE (Seulement si on ne tape pas)
             if (data.strategyData && !isTyping) {
                 strategySplits = data.strategyData;
                 localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
@@ -1183,7 +1218,7 @@ function listenToCloudRace() {
                 }
             }
 
-            // 3. MISE À JOUR FORMULAIRES (Seulement si on ne tape pas)
+            // 5. MISE À JOUR FORMULAIRES (Seulement si on ne tape pas)
             if (data.formState && !isTyping) {
                 applyFormStateToDOM(data.formState);
             }
@@ -1867,6 +1902,9 @@ function timerTick() {
     }
 
     updateLiveSpotter(elapsed, timerState);
+
+    // 🚀 Met à jour l'apparition/disparition du bouton Flash
+    evaluateFlashButtonState();
 }
 
 function updateLiveSpotter(elapsed, timerState) {
@@ -5032,3 +5070,92 @@ function applyMobileNumericKeypad() {
         }
     });
 }
+
+// ==========================================
+// --- AXE 6 : MESSAGE FLASH D'URGENCE ---
+// ==========================================
+
+function openFlashInput() {
+    if (!isEngineerMode) return;
+    document.getElementById('flash-msg-input').value = '';
+    document.getElementById('flash-char-count').innerText = '0';
+    document.getElementById('flash-input-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('flash-msg-input').focus(), 50);
+}
+
+function closeFlashInput() {
+    document.getElementById('flash-input-modal').classList.add('hidden');
+}
+
+function sendFlashMessage() {
+    if (!isEngineerMode || !currentRaceId) return;
+
+    let text = document.getElementById('flash-msg-input').value.trim();
+    if (!text) return;
+
+    // 🚀 ANTI-SPAM : On cache le bouton localement et on déclare le message vivant
+    isFlashMessageAlive = true;
+    evaluateFlashButtonState();
+
+    db.collection('races').doc(currentRaceId).update({
+        currentMessage: {
+            text: text,
+            timestamp: getUnifiedTime() // Heure atomique de naissance
+        }
+    }).catch(e => console.error("Erreur Flash:", e));
+
+    closeFlashInput();
+}
+
+function dismissFlashLocal() {
+    document.getElementById('flash-alert-overlay').classList.add('hidden');
+}
+
+// 🚀 LE RADAR DE SILENCE RADIO (Évalue si la bulle a le droit de s'afficher)
+function evaluateFlashButtonState() {
+    let btn = document.getElementById('btn-flash-msg');
+    if (!btn) return;
+
+    // 1. Spectateur OU Message déjà en cours = Invisible
+    if (!isEngineerMode || isFlashMessageAlive) {
+        btn.classList.add('hidden');
+        return;
+    }
+
+    // 2. Zone de Silence (1m30) si le chrono tourne
+    let str = localStorage.getItem('stratefreez-timer');
+    if (str && liveTimerActive) {
+        let timerState = JSON.parse(str);
+        if (timerState && timerState.active) {
+            let elapsed = getUnifiedTime() - timerState.startTimeReal;
+            let raceRem = timerState.targetSec - elapsed;
+
+            // Trouver le relais actif pour le temps avant le pit
+            let timeToPit = Infinity;
+            for (let i = 0; i < strategySplits.length; i++) {
+                if (timerState.type === 'online' && i !== timerState.splitIdx) continue;
+                for (let j = 0; j < strategySplits[i].stints.length; j++) {
+                    let stint = strategySplits[i].stints[j];
+                    if (!stint.isPitted) {
+                        timeToPit = stint.endSec - elapsed;
+                        break;
+                    }
+                }
+                if (timeToPit !== Infinity) break;
+            }
+
+            // 🚀 90000 ms = 1 minute 30 secondes
+            let isNearEnd = (raceRem >= 0 && raceRem <= 90000);
+            let isNearPit = (timeToPit >= 0 && timeToPit <= 90000);
+
+            if (isNearEnd || isNearPit) {
+                btn.classList.add('hidden');
+                return; // ⛔ Silence Radio imposé !
+            }
+        }
+    }
+
+    // Si tout est OK, la bulle est visible pour l'Ingénieur
+    btn.classList.remove('hidden');
+}
+

@@ -1596,6 +1596,58 @@ select:disabled, input:disabled, .locked-sim {
 /* ============================================================
    8. HELPERS (Marges, Couleurs, Tailles, Utilitaires)
    ============================================================ */
+/* MESSAGE FLASH (URGENCE) */
+.bg-white {
+    background-color: #fff !important;
+}
+
+.text-black {
+    color: #000 !important;
+}
+
+#flash-alert-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #000000;
+    z-index: 999; /* Au-dessus de l'app, mais sous vos modales critiques comme pit-modal (1000) car l'overlay du body.modal a z-index:1000 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Le Halo d'urgence orangé */
+    box-shadow: inset 0 0 100px 10px rgba(255, 152, 0, 0.4);
+    cursor: pointer;
+}
+
+#flash-alert-text {
+    color: #ff9800;
+    font-size: 8vw; /* Texte adaptatif énorme */
+    font-weight: 900;
+    text-align: center;
+    text-transform: uppercase;
+    padding: 20px;
+    margin: 0;
+    max-width: 90%;
+    word-wrap: break-word;
+    animation: pulseFlash 1.5s infinite ease-in-out;
+}
+
+@keyframes pulseFlash {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.85;
+        text-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+    }
+
+    50% {
+        transform: scale(1.05);
+        opacity: 1;
+        text-shadow: 0 0 30px rgba(255, 152, 0, 1);
+    }
+}
+
 .hidden {
     display: none !important;
 }

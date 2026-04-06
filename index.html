@@ -31,8 +31,14 @@
                     <li><button onclick="openTab('tab-export')" class="nav-btn btn-data">Datas</button></li>
                 </ul>
             </div>
-            <div id="save-status-badge" class="save-badge unsaved" onclick="handlePadlockClick()" title="Sauvegarder / Verrouiller">
-                <span id="save-lock-icon" class="material-symbols-outlined icon-sm">lock_open</span>
+            <div class="d-flex align-center gap-10">
+                <button id="btn-flash-msg" class="action-btn bg-white text-black hidden" onclick="openFlashInput()" title="Message Flash d'Urgence" style="border-radius: 50%; width: 38px; height: 38px; padding: 0; display: flex; justify-content: center; align-items: center; border: none;">
+                    <span class="material-symbols-outlined icon-md">maps_ugc</span>
+                </button>
+
+                <div id="save-status-badge" class="save-badge unsaved" onclick="handlePadlockClick()" title="Sauvegarder / Verrouiller">
+                    <span id="save-lock-icon" class="material-symbols-outlined icon-sm">lock_open</span>
+                </div>
             </div>
         </nav>
         <div id="global-alert-banner" class="global-alert-banner hidden">
@@ -690,6 +696,22 @@
                 <button class="action-btn btn-danger w-120" onclick="document.getElementById('generic-error-modal').classList.add('hidden')">Compris</button>
             </div>
         </div>
+    </div>
+    <div id="flash-input-modal" class="modal hidden">
+        <div class="modal-content border-top-warning text-center">
+            <h3 class="text-warning m-0"><span class="material-symbols-outlined icon-align-middle mr-8">maps_ugc</span>MESSAGE FLASH</h3>
+            <p class="help-text mt-5 mb-10">Ce message s'affichera en plein écran chez tous les utilisateurs pendant 45s.</p>
+            <textarea id="flash-msg-input" class="ia-textarea" rows="3" maxlength="100" placeholder="Ex: BOX BOX BOX !" oninput="document.getElementById('flash-char-count').innerText = this.value.length;"></textarea>
+            <div class="text-right fs-08 text-grey mt-0 mb-15"><span id="flash-char-count">0</span> / 100</div>
+            <div class="modal-btn-group mt-10">
+                <button class="action-btn btn-grey" onclick="closeFlashInput()">Annuler</button>
+                <button class="action-btn btn-warning" onclick="sendFlashMessage()">ENVOYER (URGENCE)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="flash-alert-overlay" class="hidden" onclick="dismissFlashLocal()">
+        <h1 id="flash-alert-text"></h1>
     </div>
     <div id="device-too-small">
         VOTRE APPAREIL EST TROP PETIT<br>POUR CETTE APPLICATION

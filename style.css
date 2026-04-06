@@ -191,20 +191,18 @@ body {
     border-radius: 4px;
     width: 38px;
     height: 38px;
-    font-size: 24px;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    border: 1px solid transparent;
+    border: 1px solid #000;
     box-sizing: border-box;
     color: #000;
     background: #fff;
 }
 
 .save-badge {
-    font-size: 24px;
     width: 38px;
     height: 38px;
     border-radius: 4px;
@@ -214,7 +212,7 @@ body {
     justify-content: center;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    border: 1px solid transparent;
+    border: 1px solid #fff;
     box-sizing: border-box;
 }
 
@@ -2107,6 +2105,10 @@ select:disabled, input:disabled, .locked-sim {
     font-weight: bold;
     font-size: 1.1em;
     margin-right: 10px;
+}
+
+.icon-navbar {
+    font-size: 24px;
 }
 
 .icon-sm {

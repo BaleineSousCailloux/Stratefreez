@@ -199,7 +199,7 @@ document.addEventListener('change', (e) => {
     // On enregistre ET ça tire immédiatement sur le Cloud grâce à la Voie Rapide
     saveFormState();
 
-    if (e.target.id === 'enable-pit-window' || e.target.id === 'pit-window-mode-tours') {
+    if (e.target.id === 'enable-pit-window' || e.target.id === 'pit-window-mode-tours' || e.target.id === 'global-req-tire-change') {
         togglePitWindowUI();
     }
 });
@@ -1313,6 +1313,15 @@ function togglePitWindowUI() {
         reqPitsContainer.classList.toggle('hidden', !isSoloOrOnline);
 
         if (isSoloOrOnline) {
+            // 🚀 RÈGLE FRONTEND : Changement de gomme obligatoire = 1 arrêt minimum forcé
+            let reqTireChange = document.getElementById('global-req-tire-change')?.checked;
+            if (reqTireChange) {
+                reqPitsInput.min = "1";
+                if (!reqPitsInput.value || parseInt(reqPitsInput.value) === 0) reqPitsInput.value = 1;
+            } else {
+                reqPitsInput.min = "0";
+            }
+
             let reqPitsVal = parseInt(reqPitsInput.value) || 0;
 
             // Règle 2 : Fenêtre active -> Arrêts max = 1
@@ -2565,6 +2574,17 @@ function getAvailableTires() {
     let t = [];['T', 'M', 'D', 'I', 'P'].forEach(c => { if (document.getElementById(`use-${c}`)?.checked) t.push(c); });
     return t;
 }
+// 🚀 DÉTECTEUR STRICT : L'utilisateur a-t-il renseigné le mode Éco ?
+function hasEcoData(driverName) {
+    let drvIndex = getAvailableDrivers().indexOf(driverName) + 1;
+    let drivers = parseInt(document.getElementById('num-drivers').value) || 1;
+    let isCustom = drivers > 1 && document.getElementById('personalize-drivers-toggle')?.checked;
+
+    if (isCustom) {
+        return !!document.getElementById(`drv-${drvIndex}-fuel-eco`)?.value;
+    }
+    return !!document.getElementById('cons-eco')?.value;
+}
 function getDriverFuelRate(driverName, strat) {
     if (!strat) strat = 'push';
     let drvIndex = getAvailableDrivers().indexOf(driverName) + 1;
@@ -3489,9 +3509,17 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             if (stint.isPitted) continue;
             let pushCap = getStintCapacity(i, j, false);
             if (stint.laps > pushCap) {
-                let ecoCap = getStintCapacity(i, j, true);
-                if (ecoCap > pushCap && stint.laps > pushCap) { stint.fuelStrat = 'eco'; stint.laps = Math.min(stint.laps, ecoCap); }
-                else { stint.fuelStrat = 'push'; stint.laps = pushCap; }
+                // 🚀 VÉRIFICATION STRICTE : Interdit d'utiliser l'Éco si la case est vide
+                let canUseEco = hasEcoData(strategySplits[i].driver);
+                let ecoCap = canUseEco ? getStintCapacity(i, j, true) : 0;
+
+                if (canUseEco && ecoCap > pushCap && stint.laps > pushCap) {
+                    stint.fuelStrat = 'eco';
+                    stint.laps = Math.min(stint.laps, ecoCap);
+                } else {
+                    stint.fuelStrat = 'push';
+                    stint.laps = pushCap;
+                }
             }
         }
     }
@@ -3629,9 +3657,13 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                                     if (!isLapMode && secC > 0 && futureEndSec > secC) continue;
                                 }
                                 if (stint.fuelStrat !== 'eco') {
-                                    let pushCap = getStintCapacity(s, st, false);
-                                    let ecoCap = getStintCapacity(s, st, true);
-                                    if (ecoCap > pushCap && stint.laps < ecoCap) { stint.fuelStrat = 'eco'; stint.laps++; modified = true; break; }
+                                    // 🚀 VÉRIFICATION STRICTE
+                                    let canUseEco = hasEcoData(strategySplits[s].driver);
+                                    if (canUseEco) {
+                                        let pushCap = getStintCapacity(s, st, false);
+                                        let ecoCap = getStintCapacity(s, st, true);
+                                        if (ecoCap > pushCap && stint.laps < ecoCap) { stint.fuelStrat = 'eco'; stint.laps++; modified = true; break; }
+                                    }
                                 }
                             }
                             if (modified) break;

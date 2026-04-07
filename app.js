@@ -3453,7 +3453,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                     let nPerf = getCachedPerf(nextDriver, nextStint.tire, nextStint.fuelStrat);
                     let nTargetFuel = isFuelEnabled ? (nLaps * nPerf.fuelRate) + safetyRes : 0;
                     if (isFuelEnabled && nextStint.manualFuel !== null && nextStint.manualFuel !== undefined) nTargetFuel = parseFloat(nextStint.manualFuel);
-                    if (isFuelEnabled && nTargetFuel > initialFuel) nTargetFuel = initialFuel;
+                    if (isFuelEnabled && nTargetFuel > 100) nTargetFuel = 100;
 
                     fuelToAddForNext = isFuelEnabled ? Math.max(0, nTargetFuel - residualTankLoop) : 0;
                     nextPitTime = pitLossBase;
@@ -3491,7 +3491,17 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             fSt++;
         }
         let tireRem = Math.max(0, tireLife - usedTireLaps);
-        let fuelRem = isFuelEnabled ? Math.floor((initialFuel - safetyRes) / fuelRate) : 999;
+
+        // 🚀 FIX : Le moteur comprend que seul le Relais 1 subit le "initialFuel", les autres ont droit à 100L
+        let isAbsFirst = (sIdx === 0 && stIdx === 0) || ((isOnline || isSolo) && stIdx === 0);
+        let tankCap = 100;
+        if (isAbsFirst) {
+            tankCap = initialFuel;
+        } else if (stint.manualFuel !== null && stint.manualFuel !== undefined) {
+            tankCap = parseFloat(stint.manualFuel);
+        }
+
+        let fuelRem = isFuelEnabled ? Math.floor((tankCap - safetyRes) / fuelRate) : 999;
         return Math.max(1, Math.min(tireRem, fuelRem));
     };
 

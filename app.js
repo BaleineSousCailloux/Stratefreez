@@ -1763,7 +1763,7 @@ function applyFormatters() {
         input.dataset.formatted = "true";
     });
     document.querySelectorAll('.format-liters:not([data-formatted])').forEach(input => {
-        input.addEventListener('blur', function () { let val = this.value.replace(/\D/g, ''); if (val !== '') this.value = val + " L"; });
+        input.addEventListener('blur', function () { let val = this.value.replace(/[^\d.]/g, ''); if (val !== '' && !isNaN(parseFloat(val))) this.value = parseFloat(val) + " L"; });
         input.addEventListener('focus', function () { this.value = this.value.replace(' L', ''); });
         input.dataset.formatted = "true";
     });
@@ -2163,7 +2163,7 @@ function updateLiveSpotter(elapsed, timerState) {
 
                 let targetFuel = nextStint.cachedTargetFuel || initialFuel;
                 if (isFuelEnabled && nextStint.manualFuel !== null && nextStint.manualFuel !== undefined) targetFuel = parseFloat(nextStint.manualFuel);
-                if (isFuelEnabled && targetFuel > initialFuel) targetFuel = initialFuel;
+                if (isFuelEnabled && targetFuel > 100) targetFuel = 100;
 
                 let fuelEl = document.getElementById('live-next-fuel');
                 let fuelToAdd = activeStint.fuelToAddForNext || 0;
@@ -3416,7 +3416,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 let requiredFuel = laps * fuelRate;
                 let targetFuel = isFuelEnabled ? requiredFuel + safetyRes : 0;
                 if (isFuelEnabled && stint.manualFuel !== null && stint.manualFuel !== undefined) targetFuel = parseFloat(stint.manualFuel);
-                if (isFuelEnabled && targetFuel > initialFuel) targetFuel = initialFuel; // Sécurité plafond
+                if (isFuelEnabled && targetFuel > 100) targetFuel = 100; // Sécurité plafond
 
                 let pitTime = 0;
                 if (isAbsFirst) {
@@ -3509,14 +3509,17 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             if (stint.isPitted) continue;
             let pushCap = getStintCapacity(i, j, false);
             if (stint.laps > pushCap) {
-                // 🚀 VÉRIFICATION STRICTE : Interdit d'utiliser l'Éco si la case est vide
+                // On vérifie si l'utilisateur a rempli les cases Éco
                 let canUseEco = hasEcoData(strategySplits[i].driver);
                 let ecoCap = canUseEco ? getStintCapacity(i, j, true) : 0;
 
-                if (canUseEco && ecoCap > pushCap && stint.laps > pushCap) {
+                if (canUseEco && ecoCap > pushCap) {
+                    // On a des données Éco et elles permettent de faire plus de tours
                     stint.fuelStrat = 'eco';
                     stint.laps = Math.min(stint.laps, ecoCap);
                 } else {
+                    // Pas de données Éco OU l'Éco ne sauve pas le tour supplémentaire
+                    // On force le mode Attack et on limite les tours à la capacité réelle
                     stint.fuelStrat = 'push';
                     stint.laps = pushCap;
                 }

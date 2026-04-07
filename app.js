@@ -181,11 +181,7 @@ function saveFormState() {
 // 🚀 FINI LE MINUTEUR, on supprime globalSaveTimeout
 
 document.addEventListener('input', (e) => {
-    // 🚀 L'effacement du scanner : on retire la bordure instantanément à la frappe
-    if (e.target.classList && e.target.classList.contains('mandatory-missing')) {
-        e.target.classList.remove('mandatory-missing');
-        checkRequiredFields();
-    }
+    checkRequiredFields();
     // 1. On garde uniquement les calculs visuels en direct.
     // 🚀 AUCUNE sauvegarde Cloud ne part pendant qu'on tape !
     if (['stop-timer-input', 'save-config-name', 'import-config-file', 'quick-save-name'].includes(e.target.id)) return;
@@ -196,6 +192,7 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
+    checkRequiredFields();
     // 2. 🚀 DÉCLENCHEUR ATOMIQUE : Se déclenche quand on "valide" (Entrée, Clic ailleurs, ou choix d'un menu)
     if (['stop-timer-input', 'save-config-name', 'import-config-file', 'quick-save-name'].includes(e.target.id)) return;
 
@@ -735,6 +732,9 @@ function toggleObserverMode(isLocked) {
     }
     updatePinDisplay();
     evaluateFlashButtonState(); // 🚀 Affiche/Masque la bulle selon le cadenas
+
+    // 🚀 DYNAMISME : On actualise le scanner visuel au verrouillage/déverrouillage
+    if (typeof checkRequiredFields === 'function') checkRequiredFields();
 }
 
 function handlePadlockClick() {
@@ -5377,27 +5377,32 @@ function evaluateFlashButtonState() {
 function checkRequiredFields() {
     let result = { isValid: true, firstMissingId: null, tabId: null };
 
-    const setMissing = (id, tab) => {
-        if (!result.firstMissingId) {
-            result.firstMissingId = id;
-            result.tabId = tab;
-            result.isValid = false;
-        }
-        let el = document.getElementById(id);
-        if (el) el.classList.add('mandatory-missing');
-    };
-
-    // 1. Nettoyage initial
+    // 1. Nettoyage initial (Visuel) - S'exécute toujours pour effacer le rouge
     document.querySelectorAll('.mandatory-missing').forEach(el => el.classList.remove('mandatory-missing'));
     let tireWarn = document.getElementById('tire-warning-text');
     if (tireWarn) tireWarn.classList.add('hidden');
 
+    // 🚀 SÉCURITÉ : Si on est sur l'écran d'accueil vide, on s'arrête là (pas de rouge dans le vide)
+    let currentRaceName = document.getElementById('race-name-input')?.value;
+    if (!currentRaceName || currentRaceName === "Aucune course active") return result;
+
+    const setMissing = (id, tab) => {
+        if (!result.firstMissingId) {
+            result.firstMissingId = id;
+            result.tabId = tab;
+            result.isValid = false; // 🚀 Le cerveau enregistre toujours le manque
+        }
+        // 🚀 BOUCLIER VIEWER : On met en rouge UNIQUEMENT si on est Ingénieur
+        if (isEngineerMode) {
+            let el = document.getElementById(id);
+            if (el) el.classList.add('mandatory-missing');
+        }
+    };
+
     // 2. ONGLET 1 : Les Fondations
     let goal = document.getElementById('race-goal')?.value;
     if (goal === 'time') {
-        if (getRaceDurationSeconds() <= 0) {
-            setMissing('race-duration', 'tab-params');
-        }
+        if (getRaceDurationSeconds() <= 0) setMissing('race-duration', 'tab-params');
     } else {
         let laps = parseInt(document.getElementById('race-laps')?.value) || 0;
         if (laps <= 0) setMissing('race-laps', 'tab-params');
@@ -5421,24 +5426,25 @@ function checkRequiredFields() {
         }
     }
 
-    // 3. ONGLET 2 : Contact au sol
+    // 3. ONGLET 1 : Contact au sol (Gommes)
     let tires = ['T', 'M', 'D', 'I', 'P'];
     let checkedTires = tires.filter(t => document.getElementById(`use-${t}`)?.checked);
     let reqTireChange = document.getElementById('global-req-tire-change')?.checked;
     let minTires = reqTireChange ? 2 : 1;
 
     if (checkedTires.length < minTires) {
-        if (tireWarn) {
+        // 🚀 BOUCLIER VIEWER : Pas de message texte d'erreur pour les spectateurs
+        if (tireWarn && isEngineerMode) {
             tireWarn.innerText = `Cocher ${minTires} type(s) de gomme à minima`;
             tireWarn.classList.remove('hidden');
         }
         let firstUnchecked = tires.find(t => !document.getElementById(`use-${t}`)?.checked);
-        setMissing(checkedTires.length === 0 ? 'use-T' : `use-${firstUnchecked}`, 'tab-tech');
+        setMissing(checkedTires.length === 0 ? 'use-T' : `use-${firstUnchecked}`, 'tab-params');
     }
 
     let customDrivers = document.getElementById('personalize-drivers-toggle')?.checked && !isSolo;
 
-    // 4. ONGLET 2 : Vitesse
+    // 4. ONGLET 2 : Vitesse (Chronos)
     checkedTires.forEach(t => {
         if (customDrivers) {
             for (let i = 1; i <= numDrivers; i++) {
@@ -5449,12 +5455,12 @@ function checkRequiredFields() {
         }
     });
 
-    // 5. ONGLET 2 : Carburant
+    // 5. ONGLET 1 & 2 : Carburant
     let fuelStartStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
     let fuelStart = fuelStartStr ? parseFloat(fuelStartStr) : 0;
 
     if (fuelStart > 0) {
-        if (!document.getElementById('fuel-speed')?.value) setMissing('fuel-speed', 'tab-tech');
+        if (!document.getElementById('fuel-speed')?.value) setMissing('fuel-speed', 'tab-params');
 
         if (customDrivers) {
             for (let i = 1; i <= numDrivers; i++) {
@@ -5470,17 +5476,23 @@ function checkRequiredFields() {
 
 function navigateToSmartTab() {
     let scan = checkRequiredFields();
+
     if (scan.isValid) {
         openTab('tab-strategy');
     } else {
-        openTab(scan.tabId);
-        setTimeout(() => {
-            let el = document.getElementById(scan.firstMissingId);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                el.focus();
-            }
-        }, 150);
+        // 🚀 SÉCURITÉ UX : Un spectateur ne doit pas être "aspiré" vers les cases vides
+        if (!isEngineerMode) {
+            openTab('tab-strategy'); // Il verra simplement l'écran central "Paramètres insuffisants"
+        } else {
+            // L'Ingénieur est guidé vers son erreur
+            openTab(scan.tabId);
+            setTimeout(() => {
+                let el = document.getElementById(scan.firstMissingId);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.focus();
+                }
+            }, 150);
+        }
     }
 }
-

@@ -590,10 +590,26 @@ input[type="number"]::-webkit-outer-spin-button {
     margin-bottom: 0 !important;
 }
 
+.mandatory-missing {
+    border: 2px solid #cc2d53 !important;
+    box-shadow: 0 0 8px rgba(204, 45, 83, 0.5) !important;
+    transition: all 0.3s ease;
+}
+
 
 /* ============================================================
    4. SPÉCIFIQUE ONGLET 3 (Course / Stratégie)
    ============================================================ */
+#strategy-insufficient-data {
+    margin-top: 80px;
+    margin-bottom: 80px;
+}
+
+    #strategy-insufficient-data .icon-huge-grey {
+        color: #444;
+        font-size: 80px;
+    }
+
 .split-block {
     background: #2a2a2a;
     border: 1px solid #777;

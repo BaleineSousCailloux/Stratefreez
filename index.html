@@ -124,7 +124,7 @@
                     </div>
                     <div id="splits-container" class="hidden">
                         <label id="label-total-splits" for="total-splits">Total de splits/relais</label>
-                        <input type="number" id="total-splits" min="1" value="1" placeholder="Nombre" onchange="updateDynamicFields(); autoFillStartTimes();">
+                        <input type="number" id="total-splits" min="1" value="1" placeholder="Nombre" onchange="this.dataset.touched = 'true'; updateDynamicFields(); autoFillStartTimes();">
                     </div>
                     <div class="calculated-info hidden" id="calc-split-container">
                         Taille d'un <span id="text-split-calc">split</span> : <span id="calc-split-duration" class="highlight-text">-</span>
@@ -229,6 +229,7 @@
 
                 <fieldset>
                     <legend>Gommes utilisables :</legend>
+                    <p id="tire-warning-text" class="text-danger hidden font-weight-bold mb-10 m-0"></p>
                     <div class="tire-block"><label class="tire-toggle"><input type="checkbox" id="use-T" onchange="toggleTireOptions('T')"> Tendres (T)</label><div id="options-T" class="tire-options hidden"><div class="tire-condition hide-on-solo"><span><input type="checkbox" class="cond-check" id="cb-T-1" onchange="handleTireCondition(this)"> Obligation en splits/relais complets ?</span><input type="number" id="val-T-1" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-T-2" onchange="handleTireCondition(this)"> Obligation en nombre de trains ?</span><input type="number" id="val-T-2" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-T-3" onchange="handleTireCondition(this)"> Limitation en nombre max de trains ?</span><input type="number" id="val-T-3" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div></div></div>
                     <div class="tire-block"><label class="tire-toggle"><input type="checkbox" id="use-M" onchange="toggleTireOptions('M')"> Mediums (M)</label><div id="options-M" class="tire-options hidden"><div class="tire-condition hide-on-solo"><span><input type="checkbox" class="cond-check" id="cb-M-1" onchange="handleTireCondition(this)"> Obligation en splits/relais complets ?</span><input type="number" id="val-M-1" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-M-2" onchange="handleTireCondition(this)"> Obligation en nombre de trains ?</span><input type="number" id="val-M-2" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-M-3" onchange="handleTireCondition(this)"> Limitation en nombre max de trains ?</span><input type="number" id="val-M-3" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div></div></div>
                     <div class="tire-block"><label class="tire-toggle"><input type="checkbox" id="use-D" onchange="toggleTireOptions('D')"> Durs (D)</label><div id="options-D" class="tire-options hidden"><div class="tire-condition hide-on-solo"><span><input type="checkbox" class="cond-check" id="cb-D-1" onchange="handleTireCondition(this)"> Obligation en splits/relais complets ?</span><input type="number" id="val-D-1" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-D-2" onchange="handleTireCondition(this)"> Obligation en nombre de trains ?</span><input type="number" id="val-D-2" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div><div class="tire-condition"><span><input type="checkbox" class="cond-check" id="cb-D-3" onchange="handleTireCondition(this)"> Limitation en nombre max de trains ?</span><input type="number" id="val-D-3" min="1" class="inline-input cond-val" onchange="handleTireValue(this)"></div></div></div>
@@ -312,6 +313,11 @@
         </section>
 
         <section id="tab-strategy" class="tab-content hidden">
+            <div id="strategy-insufficient-data" class="hidden text-center">
+                <span class="material-symbols-outlined icon-huge-grey">build_circle</span>
+                <h2 class="text-huge-spaced text-grey mt-15">PARAMÈTRES INSUFFISANTS</h2>
+                <p class="help-text fs-1-2">Veuillez renseigner les informations obligatoires encadrées en rouge dans les onglets précédents.</p>
+            </div>
             <div class="tab-header-flex">
                 <h2>Suivi de course</h2>
                 <div class="d-flex gap-10">
@@ -324,7 +330,6 @@
                     </button>
                 </div>
             </div>
-
             <div id="strategy-blocks-container"></div>
 
             <div id="global-team-validation" class="global-team-validation hidden">

@@ -181,6 +181,11 @@ function saveFormState() {
 // 🚀 FINI LE MINUTEUR, on supprime globalSaveTimeout
 
 document.addEventListener('input', (e) => {
+    // 🚀 L'effacement du scanner : on retire la bordure instantanément à la frappe
+    if (e.target.classList && e.target.classList.contains('mandatory-missing')) {
+        e.target.classList.remove('mandatory-missing');
+        checkRequiredFields();
+    }
     // 1. On garde uniquement les calculs visuels en direct.
     // 🚀 AUCUNE sauvegarde Cloud ne part pendant qu'on tape !
     if (['stop-timer-input', 'save-config-name', 'import-config-file', 'quick-save-name'].includes(e.target.id)) return;
@@ -239,7 +244,7 @@ function updateAlertVisibility() {
     }
 }
 
-function updateLiveStandbyState(isStopAction = false) {
+function updateLiveStandbyState(isRaceEnd = false) {
     let overlay = document.getElementById('live-standby-overlay');
     if (!overlay) return;
 
@@ -254,15 +259,41 @@ function updateLiveStandbyState(isStopAction = false) {
         overlay.classList.add('hidden');
         clearTimeout(liveStandbyTimeout);
     } else {
-        // Chrono arrêté
-        if (isStopAction) {
-            // Clic sur Stop : On attend 5 min (300 000 ms) avant de réafficher le bouton
+        // 🚀 FIX 3 : Le Cerveau du Bouton Géant (Online vs IRL)
+        let btn = document.getElementById('btn-giant-start');
+        let raceType = document.getElementById('race-type')?.value;
+        let isOnline = (raceType === 'online');
+        let nextSplitIdx = 0;
+
+        if (isOnline) {
+            // Cherche le premier relais non terminé
+            for (let i = 0; i < strategySplits.length; i++) {
+                if (!strategySplits[i].isFinished) {
+                    nextSplitIdx = i;
+                    break;
+                }
+            }
+            if (btn) {
+                btn.innerText = `DÉPART RELAIS ${nextSplitIdx + 1}`;
+                btn.onclick = () => startLiveTimer(nextSplitIdx);
+            }
+        } else {
+            if (btn) {
+                btn.innerText = `DÉPART DE LA COURSE`;
+                btn.onclick = () => startLiveTimer(0);
+            }
+        }
+
+        // 🚀 FIX 2 : Affichage Immédiat ou Délai de 3 minutes
+        if (isRaceEnd) {
+            // Fin naturelle (Course ou Relais) : On attend 3 min (180 000 ms)
             clearTimeout(liveStandbyTimeout);
             liveStandbyTimeout = setTimeout(() => {
                 if (!liveTimerActive) overlay.classList.remove('hidden');
-            }, 300000);
+            }, 180000);
         } else {
-            // Affichage normal quand on navigue sans chrono actif
+            // Arrêt manuel ou navigation : Affichage immédiat
+            clearTimeout(liveStandbyTimeout);
             overlay.classList.remove('hidden');
         }
     }
@@ -565,7 +596,7 @@ function loadConfig(event) {
                 saveFormState();
                 lastCalculatedState = localStorage.getItem('stratefreez-form-state');
                 renderStrategy();
-                openTab('tab-strategy');
+                navigateToSmartTab();
 
             } else {
                 showErrorModal("Fichier non valide : structure incorrecte.");
@@ -792,11 +823,8 @@ document.addEventListener('DOMContentLoaded', () => {
         isEngineerMode = false;
         toggleObserverMode(true);
 
-        // Focus intelligent : On force l'onglet 3 si on était sur les paramétrages au moment du crash
-        let savedTab = localStorage.getItem('stratefreez-current-tab') || 'tab-strategy';
-        if (savedTab === 'tab-params' || savedTab === 'tab-tech') savedTab = 'tab-strategy';
-        openTab(savedTab);
-        /*setSaveBadge(false);*/
+        // Focus intelligent
+        navigateToSmartTab();
 
     } else {
         // --- CAS B : NOUVELLE SESSION (Course vierge ou terminée) ---
@@ -894,6 +922,14 @@ function clearCurrentRaceData() {
 }
 
 function openNewRaceModal() {
+    let input = document.getElementById('new-race-input');
+    if (input) input.value = '';
+    let errorMsg = document.getElementById('new-race-error');
+    if (errorMsg) {
+        errorMsg.innerText = '';
+        errorMsg.classList.add('hidden');
+    }
+
     document.getElementById('new-race-modal').classList.remove('hidden');
     setTimeout(() => document.getElementById('new-race-input').focus(), 50);
 }
@@ -1121,8 +1157,7 @@ async function confirmSwitchRace() {
 
             // 4. ON BRANCHE L'ÉCOUTE EN TEMPS RÉEL
             listenToCloudRace();
-
-            openTab('tab-strategy');
+            navigateToSmartTab();
         } else {
             showErrorModal("Cette course n'existe plus sur le serveur.");
             clearCurrentRaceData();
@@ -1156,12 +1191,14 @@ function listenToCloudRace() {
                 if (!localTimer || !localTimer.active || localTimer.startTimeReal !== data.timerState.startTimeReal) {
                     localStorage.setItem('stratefreez-timer', JSON.stringify(data.timerState));
                     loadTimerState(); // Relance la boucle de chrono visuel locale
+                    updateLiveStandbyState(); // 🚀 FIX 1 : On cache l'écran pour les autres ingénieurs
                 }
             } else {
                 // Le cloud dit que le chrono est arrêté
                 if (localTimer && localTimer.active) {
                     // 🚀 ARRÊT SILENCIEUX (Empêche la boucle infinie avec Firebase)
                     stopTimer(false, true);
+                    updateLiveStandbyState(); // 🚀 FIX 1 : On cache l'écran pour les autres ingénieurs
                 }
             }
             // 🚀 3 RÉCEPTION DU MESSAGE FLASH
@@ -1480,6 +1517,27 @@ function updateDynamicFields() {
         let label = child.querySelector('label');
         if (label) label.innerText = (neededTimes === 1) ? "Heure de départ prévue" : `Départ ${term} ${index + 1}`;
     });
+
+    // 🚀 FIX : Force la resynchronisation visuelle de l'objectif (Temps vs Tours)
+    if (typeof toggleRaceGoal === 'function') toggleRaceGoal();
+
+    // 🚀 AUTO-REMPLISSAGE : Les valeurs par défaut intelligentes (Règles 1 et 2)
+    if (!isSolo) {
+        let totalSplitsEl = document.getElementById('total-splits');
+        let mandatorySplitsEl = document.getElementById('mandatory-splits');
+        let currentDrivers = parseInt(document.getElementById('num-drivers')?.value) || 1;
+
+        // Règle 1 : Total de relais par défaut = nombre de pilotes
+        if (totalSplitsEl && !totalSplitsEl.dataset.touched) {
+            totalSplitsEl.value = currentDrivers;
+        }
+
+        // Règle 2 : Relais obligatoires par défaut = Total / Nombre de pilotes
+        if (mandatorySplitsEl && !mandatorySplitsEl.dataset.touched) {
+            let total = parseInt(totalSplitsEl.value) || currentDrivers;
+            mandatorySplitsEl.value = Math.max(1, Math.floor(total / currentDrivers));
+        }
+    }
 
     updateTechDrivers(drivers);
     syncTiresVisibility();
@@ -2001,9 +2059,18 @@ function updateLiveSpotter(elapsed, timerState) {
         let fuelPill = document.getElementById('live-fuel-pill'); if (fuelPill) fuelPill.className = `live-fuel-pill ${fStrat === 'PUSH' ? 'bg-fuel-push' : 'bg-fuel-eco'}`;
         let fuelStratEl = document.getElementById('live-fuel-strat');
         if (fuelStratEl) {
-            fuelStratEl.innerText = fuelRate.toFixed(2) + " L/t";
-            fuelStratEl.className = fStrat === 'PUSH' ? 'text-push cursor-pointer ml-8' : 'text-eco cursor-pointer ml-8';
-            fuelStratEl.onclick = () => toggleStintFuelStrat(activeStint.splitIdx, activeStint.stintIdx);
+            let rawFuelTopStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+            let isFuelEnabledTop = (rawFuelTopStr ? parseFloat(rawFuelTopStr) : 0) > 0;
+
+            if (!isFuelEnabledTop) {
+                fuelStratEl.innerText = "-";
+                fuelStratEl.className = 'text-warning ml-8 font-weight-bold';
+                fuelStratEl.onclick = null;
+            } else {
+                fuelStratEl.innerText = fuelRate.toFixed(2) + " L/t";
+                fuelStratEl.className = fStrat === 'PUSH' ? 'text-push cursor-pointer ml-8' : 'text-eco cursor-pointer ml-8';
+                fuelStratEl.onclick = () => toggleStintFuelStrat(activeStint.splitIdx, activeStint.stintIdx);
+            }
         }
 
         let timeInStint = elapsed - activeStint.startSec;
@@ -2071,18 +2138,28 @@ function updateLiveSpotter(elapsed, timerState) {
                     else tireContainer.innerHTML = `<span class="text-grey font-weight-bold fs-1-2">Conserver ${activeStint.tire}</span>`;
                 }
 
-                let targetFuel = nextStint.cachedTargetFuel || 100;
-                if (nextStint.manualFuel !== null && nextStint.manualFuel !== undefined) targetFuel = parseFloat(nextStint.manualFuel);
-                if (targetFuel > 100) targetFuel = 100;
+                let rawFuelStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+                let initialFuel = rawFuelStr ? parseFloat(rawFuelStr) : 0;
+                let isFuelEnabled = (initialFuel > 0);
+
+                let targetFuel = nextStint.cachedTargetFuel || initialFuel;
+                if (isFuelEnabled && nextStint.manualFuel !== null && nextStint.manualFuel !== undefined) targetFuel = parseFloat(nextStint.manualFuel);
+                if (isFuelEnabled && targetFuel > initialFuel) targetFuel = initialFuel;
 
                 let fuelEl = document.getElementById('live-next-fuel');
                 let fuelToAdd = activeStint.fuelToAddForNext || 0;
                 if (fuelEl) {
-                    let isManual = (nextStint.manualFuel !== null && nextStint.manualFuel !== undefined);
-                    let manualClass = isManual ? "manual-override-text" : "";
-                    if (fuelToAdd > 0) { fuelEl.innerText = `${targetFuel.toFixed(1)} L`; fuelEl.className = `fuel-highlight text-warning ml-8 cursor-pointer ${manualClass}`; }
-                    else { fuelEl.innerText = `NON`; fuelEl.className = `pit-no-fuel text-success ml-8 cursor-pointer ${manualClass}`; }
-                    fuelEl.onclick = () => openFuelModal(nextStint.splitIdx, nextStint.stintIdx, nextStint.cachedTargetFuel);
+                    if (!isFuelEnabled) {
+                        fuelEl.innerText = `-`;
+                        fuelEl.className = `pit-no-fuel text-warning ml-8 font-weight-bold`;
+                        fuelEl.onclick = null;
+                    } else {
+                        let isManual = (nextStint.manualFuel !== null && nextStint.manualFuel !== undefined);
+                        let manualClass = isManual ? "manual-override-text" : "";
+                        if (fuelToAdd > 0) { fuelEl.innerText = `${targetFuel.toFixed(1)} L`; fuelEl.className = `fuel-highlight text-warning ml-8 cursor-pointer ${manualClass}`; }
+                        else { fuelEl.innerText = `NON`; fuelEl.className = `pit-no-fuel text-success ml-8 cursor-pointer ${manualClass}`; }
+                        fuelEl.onclick = () => openFuelModal(nextStint.splitIdx, nextStint.stintIdx, nextStint.cachedTargetFuel);
+                    }
                 }
 
                 let pitTimeEl = document.getElementById('live-next-pit-time');
@@ -2179,21 +2256,30 @@ function stopTimer(isRaceEnd, isSilent = false) {
     }
     document.querySelectorAll('.active-live-stint').forEach(el => el.classList.remove('active-live-stint'));
 
-    // 🚀 LE SILENCE RADIO : Si c'est un arrêt purement local de nettoyage, on s'arrête ici.
+    // 🚀 LE SILENCE RADIO : Si c'est un arrêt purement local
     if (isSilent) {
         renderStrategy();
         updateLiveSpotter(0, null);
         return; // ⛔ Bloque la descente vers Firebase !
     }
 
-    // 🚀 GESTION DU CLOUD (Arrêt volontaire par l'ingénieur via un bouton)
+    // 🚀 GESTION DU CLOUD
     if (isRaceEnd) {
+        let allFinished = strategySplits.every(s => s.isFinished);
+        let isOnline = document.getElementById('race-type')?.value === 'online';
+
+        let updatePayload = {
+            isTimerRunning: false,
+            timerState: null
+        };
+
+        // 🚀 PROTECTION EN LIGNE : On ne clotûre définitivement la course que si TOUT est fini (ou IRL)
+        if (allFinished || !isOnline) {
+            updatePayload.isActive = false;
+        }
+
         if (currentRaceId) {
-            db.collection('races').doc(currentRaceId).update({
-                isActive: false,
-                isTimerRunning: false,
-                timerState: null
-            }).catch(e => console.error(e));
+            db.collection('races').doc(currentRaceId).update(updatePayload).catch(e => console.error(e));
         }
 
         let banner = document.getElementById('end-race-banner');
@@ -2212,7 +2298,7 @@ function stopTimer(isRaceEnd, isSilent = false) {
 
     renderStrategy();
     updateLiveSpotter(0, null);
-    updateLiveStandbyState(true);
+    updateLiveStandbyState(isRaceEnd); // 🚀 FIX 2 : On passe la vraie raison de l'arrêt (True = 3 min, False = Immédiat)
 }
 
 function loadTimerState() {
@@ -2357,6 +2443,8 @@ function toggleStintFuelStrat(i, j) {
     }
 }
 function openFuelModal(i, j, calcValue) {
+    let rawFuelStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+    if (!rawFuelStr || parseFloat(rawFuelStr) <= 0) return; // 🚀 BOUCLIER ESSENCE
     if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
 
     // 1. Calcul du Résiduel via la variable 'residualAtEnd' déjà calculée par votre cascade
@@ -3252,7 +3340,9 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
     let splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0; // 🚀 MS
     let targetPerRelayLaps = splitsCount > 0 ? Math.floor(targetLapsRace / splitsCount) : 0;
 
-    let initialFuel = parseFloat(document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '')) || 100;
+    let rawFuelStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+    let initialFuel = rawFuelStr ? parseFloat(rawFuelStr) : 0;
+    let isFuelEnabled = (initialFuel > 0); // 🚀 LE DRAPEAU
     let fillSpeed = parseFloat(document.getElementById('fuel-speed')?.value.replace(',', '.').replace(/[^\d.]/g, '')) || 5;
 
     // 🚀 LES BASES EN MS
@@ -3294,9 +3384,9 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 let perf = getCachedPerf(strategySplits[i].driver, stint.tire, stint.fuelStrat);
                 let fuelRate = perf.fuelRate;
                 let requiredFuel = laps * fuelRate;
-                let targetFuel = requiredFuel + safetyRes;
-                if (stint.manualFuel !== null && stint.manualFuel !== undefined) targetFuel = parseFloat(stint.manualFuel);
-                if (targetFuel > 100) targetFuel = 100;
+                let targetFuel = isFuelEnabled ? requiredFuel + safetyRes : 0;
+                if (isFuelEnabled && stint.manualFuel !== null && stint.manualFuel !== undefined) targetFuel = parseFloat(stint.manualFuel);
+                if (isFuelEnabled && targetFuel > initialFuel) targetFuel = initialFuel; // Sécurité plafond
 
                 let pitTime = 0;
                 if (isAbsFirst) {
@@ -3304,9 +3394,9 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 } else {
                     pitTime = pitLossBase;
                     if (stint.changeTires) pitTime += pitTireBase;
-                    let fuelToAdd = Math.max(0, targetFuel - residualTankLoop);
+                    let fuelToAdd = isFuelEnabled ? Math.max(0, targetFuel - residualTankLoop) : 0;
                     stint.fuelAddedAtStart = fuelToAdd;
-                    if (fuelToAdd > 0) pitTime += (fuelToAdd / fillSpeed) * 1000; // 🚀 Vitesse convertie en ajout ms
+                    if (fuelToAdd > 0 && fillSpeed > 0) pitTime += (fuelToAdd / fillSpeed) * 1000;
                     residualTankLoop += fuelToAdd;
                     globalSecLoop += pitTime;
                 }
@@ -3331,14 +3421,14 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 if (nextStint) {
                     let nLaps = parseInt(nextStint.laps) || 0;
                     let nPerf = getCachedPerf(nextDriver, nextStint.tire, nextStint.fuelStrat);
-                    let nTargetFuel = (nLaps * nPerf.fuelRate) + safetyRes;
-                    if (nextStint.manualFuel !== null && nextStint.manualFuel !== undefined) nTargetFuel = parseFloat(nextStint.manualFuel);
-                    if (nTargetFuel > 100) nTargetFuel = 100;
+                    let nTargetFuel = isFuelEnabled ? (nLaps * nPerf.fuelRate) + safetyRes : 0;
+                    if (isFuelEnabled && nextStint.manualFuel !== null && nextStint.manualFuel !== undefined) nTargetFuel = parseFloat(nextStint.manualFuel);
+                    if (isFuelEnabled && nTargetFuel > initialFuel) nTargetFuel = initialFuel;
 
-                    fuelToAddForNext = Math.max(0, nTargetFuel - residualTankLoop);
+                    fuelToAddForNext = isFuelEnabled ? Math.max(0, nTargetFuel - residualTankLoop) : 0;
                     nextPitTime = pitLossBase;
                     if (nextStint.changeTires) nextPitTime += pitTireBase;
-                    if (fuelToAddForNext > 0) nextPitTime += (fuelToAddForNext / fillSpeed) * 1000; // 🚀 MS
+                    if (fuelToAddForNext > 0 && fillSpeed > 0) nextPitTime += (fuelToAddForNext / fillSpeed) * 1000;
                 }
                 stint.fuelToAddForNext = fuelToAddForNext; stint.nextPitTime = nextPitTime;
             }
@@ -3371,7 +3461,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             fSt++;
         }
         let tireRem = Math.max(0, tireLife - usedTireLaps);
-        let fuelRem = Math.floor((100 - safetyRes) / fuelRate);
+        let fuelRem = isFuelEnabled ? Math.floor((initialFuel - safetyRes) / fuelRate) : 999;
         return Math.max(1, Math.min(tireRem, fuelRem));
     };
 
@@ -3990,6 +4080,25 @@ function checkGlobalRules() {
 
 function renderStrategy() {
     const container = document.getElementById('strategy-blocks-container');
+    const errorScreen = document.getElementById('strategy-insufficient-data');
+    let scan = checkRequiredFields();
+
+    // 🚀 LE BOUCLIER : Si données manquantes, on bloque les calculs et on affiche l'écran
+    if (!scan.isValid) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        if (errorScreen) errorScreen.classList.remove('hidden');
+
+        let teamValidation = document.getElementById('global-team-validation');
+        if (teamValidation) teamValidation.classList.add('hidden');
+
+        updateAlertVisibility();
+        return; // STOP. On ne calcule pas le tableau fantôme.
+    }
+
+    // Feu vert : On cache l'erreur et on génère le tableau
+    container.classList.remove('hidden');
+    if (errorScreen) errorScreen.classList.add('hidden');
     container.innerHTML = '';
     const raceType = document.getElementById('race-type')?.value || 'irl';
     const goal = document.getElementById('race-goal')?.value;
@@ -3999,7 +4108,9 @@ function renderStrategy() {
     let drvOptsArr = getAvailableDrivers();
     let sptOptsArr = getAvailableSpotters();
     let tireOptsArr = getAvailableTires();
-    let initialFuel = parseFloat(document.getElementById('fuel-start').value.replace(/[^\d.]/g, '')) || 100;
+    let rawFuelStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+    let initialFuel = rawFuelStr ? parseFloat(rawFuelStr) : 0;
+    let isFuelEnabled = (initialFuel > 0);
 
     let grandTotalLaps = 0;
     let totalSecRace = getRaceDurationSeconds(); // 🚀 MS
@@ -4084,7 +4195,7 @@ function renderStrategy() {
             let lockedTire = (!isAbsoluteFirst && !stint.changeTires && !isHistorical) ?
                 ((j > 0) ? split.stints[j - 1].tire : strategySplits[i - 1].stints[strategySplits[i - 1].stints.length - 1].tire) : null;
 
-            let targetFuelForStint = (stint.manualFuel !== null && stint.manualFuel !== undefined) ? parseFloat(stint.manualFuel) : (stint.cachedTargetFuel || 100);
+            let targetFuelForStint = (stint.manualFuel !== null && stint.manualFuel !== undefined) ? parseFloat(stint.manualFuel) : (stint.cachedTargetFuel || initialFuel);
 
             // 🚀 AFFICHAGE : Conversion du pit time en ms vers secondes
             let pitStr = isAbsoluteFirst ? "Départ" : (stint.pitTime ? Math.ceil(stint.pitTime / 1000) + "s" : "-");
@@ -4113,9 +4224,14 @@ function renderStrategy() {
             let fuelRateDisplay = (stint.fuelRate || 0).toFixed(2) + " L/t";
             let manualFuelClass = stint.manualFuel !== null ? 'manual-override-text' : '';
 
-            let fuelCellHTML = isAbsoluteFirst ? `<span class="px-5 py-2">${initialFuel.toFixed(1)}<span class="unite"> L</span></span>` :
-                (isHistorical ? `<span class="inline-block px-5 py-2">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>` :
-                    `<span class="inline-block cursor-pointer px-5 py-2 border-radius-4 ${manualFuelClass}" onclick="openFuelModal(${i}, ${j}, ${stint.cachedTargetFuel})">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>`);
+            let fuelCellHTML = "";
+            if (!isFuelEnabled) {
+                fuelCellHTML = `<span class="inline-block px-5 py-2 text-warning font-weight-bold">-</span>`;
+            } else {
+                fuelCellHTML = isAbsoluteFirst ? `<span class="px-5 py-2">${initialFuel.toFixed(1)}<span class="unite"> L</span></span>` :
+                    (isHistorical ? `<span class="inline-block px-5 py-2">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>` :
+                        `<span class="inline-block cursor-pointer px-5 py-2 border-radius-4 ${manualFuelClass}" onclick="openFuelModal(${i}, ${j}, ${stint.cachedTargetFuel})">${targetFuelForStint.toFixed(1)}<span class="unite"> L</span></span>`);
+            }
 
             let lapsInputHTML = (isLockedStint || isHistorical) ?
                 `<input type="text" class="table-input" value="${stint.laps}" disabled title="Verrouillé">` :
@@ -4470,7 +4586,18 @@ function closeExportErrorModal() {
 }
 
 function generateIARequest() {
-    let raceType = document.getElementById('race-type')?.value;
+    // 🚀 LECTURE INTELLIGENTE : Si 1 seul pilote, on force le type à "Solo"
+    let numDrivers = parseInt(document.getElementById('num-drivers')?.value) || 1;
+    let raceTypeValue = document.getElementById('race-type')?.value?.toLowerCase();
+    let raceType = "";
+    if (numDrivers === 1) {
+        raceType = "Course normale, en solo";
+    } else if (raceTypeValue === 'online') {
+        raceType = "Enchaînement de plusieurs relais online, chaque relais est traité comme une course individuelle, seules les règles de pneus s'appliquent sur l'ensemble des relais, les autres règles s'applique à chaque relais";
+    } else if (raceTypeValue === 'irl') {
+        raceType = "Une seule course multi-pilotes divisée en splits. Un enchaînement éventuel de splits par un même pilote sera nommé un relais.";
+    }
+
     let goal = document.getElementById('race-goal')?.value;
 
     // Récupération de la variable du fichier prompt.js (ou fallback si introuvable)
@@ -4566,7 +4693,9 @@ function printStrategy() {
     const splitsCount = parseInt(document.getElementById('total-splits').value) || 1;
     const splitDurSec = splitsCount > 0 ? totalSecRace / splitsCount : 0;
     const targetLapsRace = parseInt(document.getElementById('race-laps')?.value) || 0;
-    const initialFuel = parseFloat(document.getElementById('fuel-start').value.replace(/[^\d.]/g, '')) || 100;
+    const rawFuelStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+    const initialFuel = rawFuelStr ? parseFloat(rawFuelStr) : 0;
+    const isFuelEnabled = (initialFuel > 0);
 
     strategySplits.forEach((split, i) => {
         let isLastSplit = (i === strategySplits.length - 1);
@@ -4633,13 +4762,13 @@ function printStrategy() {
         split.stints.forEach((stint, j) => {
             let isAbsoluteFirst = (i === 0 && j === 0) || ((isOnline || isSolo) && j === 0);
 
-            let targetFuelForStint = stint.cachedTargetFuel || 100;
+            let targetFuelForStint = stint.cachedTargetFuel || initialFuel;
             if (isAbsoluteFirst) targetFuelForStint = initialFuel;
             else if (stint.manualFuel !== null && stint.manualFuel !== undefined) {
                 targetFuelForStint = parseFloat(stint.manualFuel);
             }
 
-            let targetFuelText = targetFuelForStint.toFixed(1) + " L";
+            let targetFuelText = isFuelEnabled ? (targetFuelForStint.toFixed(1) + " L") : "-";
 
             // 🚀 AFFICHAGE : Arrondi en secondes pour l'heure de fin de relais
             let displayEnd = Math.round((stint.endSec || 0) / 1000);
@@ -4971,7 +5100,7 @@ function restoreSnapshot(idx) {
     renderStrategy();
 
     document.getElementById('snapshot-select').value = ""; // Reset du select
-    openTab('tab-strategy'); // On bascule sur la stratégie pour voir le résultat
+    navigateToSmartTab();
 }
 
 // ==========================================
@@ -5094,8 +5223,7 @@ function handleLocalFileSelect(event) {
 
                         // On relance le radar réseau sur la nouvelle course
                         listenToCloudRace();
-
-                        openTab('tab-strategy');
+                        navigateToSmartTab();
 
                         // Message de succès
                         let banner = document.getElementById('end-race-banner');
@@ -5127,17 +5255,20 @@ function handleLocalFileSelect(event) {
     event.target.value = "";
 }
 
-// 🚀 FORCE LE CLAVIER DÉCIMAL UNIVERSEL SUR TOUS LES NOMBRES
+// 🚀 FORCE LE CLAVIER DÉCIMAL UNIVERSEL (Nombres purs + Champs de temps formatés)
 function applyMobileNumericKeypad() {
-    document.querySelectorAll('input[type="number"]').forEach(input => {
+    // On cible les type="number" existants ET toutes vos classes de formatage textuel
+    let cibles = 'input[type="number"], .format-hhmm, .format-mss000, .format-sec, .format-liters, .format-lps, .format-lpt';
+
+    document.querySelectorAll(cibles).forEach(input => {
         input.setAttribute('inputmode', 'decimal');
+
         // Nettoie les anciens patterns si jamais il en reste
         if (input.hasAttribute('pattern')) {
             input.removeAttribute('pattern');
         }
     });
 }
-
 // ==========================================
 // --- AXE 6 : MESSAGE FLASH D'URGENCE ---
 // ==========================================
@@ -5224,5 +5355,118 @@ function evaluateFlashButtonState() {
 
     // Si tout est OK, la bulle est visible pour l'Ingénieur
     btn.classList.remove('hidden');
+}
+
+// ==========================================
+// --- LE SCANNER SILENCIEUX (Aiguillage) ---
+// ==========================================
+function checkRequiredFields() {
+    let result = { isValid: true, firstMissingId: null, tabId: null };
+
+    const setMissing = (id, tab) => {
+        if (!result.firstMissingId) {
+            result.firstMissingId = id;
+            result.tabId = tab;
+            result.isValid = false;
+        }
+        let el = document.getElementById(id);
+        if (el) el.classList.add('mandatory-missing');
+    };
+
+    // 1. Nettoyage initial
+    document.querySelectorAll('.mandatory-missing').forEach(el => el.classList.remove('mandatory-missing'));
+    let tireWarn = document.getElementById('tire-warning-text');
+    if (tireWarn) tireWarn.classList.add('hidden');
+
+    // 2. ONGLET 1 : Les Fondations
+    let goal = document.getElementById('race-goal')?.value;
+    if (goal === 'time') {
+        if (getRaceDurationSeconds() <= 0) {
+            setMissing('race-duration', 'tab-params');
+        }
+    } else {
+        let laps = parseInt(document.getElementById('race-laps')?.value) || 0;
+        if (laps <= 0) setMissing('race-laps', 'tab-params');
+    }
+
+    let numDrivers = parseInt(document.getElementById('num-drivers')?.value) || 1;
+    let raceType = document.getElementById('race-type')?.value;
+    let isOnline = (raceType === 'online');
+    let isSolo = (numDrivers === 1);
+
+    if (!isSolo) {
+        let totalSplits = parseInt(document.getElementById('total-splits')?.value) || 0;
+        if (totalSplits <= 0) setMissing('total-splits', 'tab-params');
+
+        let manSplitsStr = document.getElementById('mandatory-splits')?.value;
+        if (manSplitsStr === "" || isNaN(parseInt(manSplitsStr))) setMissing('mandatory-splits', 'tab-params');
+
+        if (!isOnline) {
+            let maxConsStr = document.getElementById('max-consecutive-splits')?.value;
+            if (maxConsStr === "" || isNaN(parseInt(maxConsStr))) setMissing('max-consecutive-splits', 'tab-params');
+        }
+    }
+
+    // 3. ONGLET 2 : Contact au sol
+    let tires = ['T', 'M', 'D', 'I', 'P'];
+    let checkedTires = tires.filter(t => document.getElementById(`use-${t}`)?.checked);
+    let reqTireChange = document.getElementById('global-req-tire-change')?.checked;
+    let minTires = reqTireChange ? 2 : 1;
+
+    if (checkedTires.length < minTires) {
+        if (tireWarn) {
+            tireWarn.innerText = `Cocher ${minTires} type(s) de gomme à minima`;
+            tireWarn.classList.remove('hidden');
+        }
+        let firstUnchecked = tires.find(t => !document.getElementById(`use-${t}`)?.checked);
+        setMissing(checkedTires.length === 0 ? 'use-T' : `use-${firstUnchecked}`, 'tab-tech');
+    }
+
+    let customDrivers = document.getElementById('personalize-drivers-toggle')?.checked && !isSolo;
+
+    // 4. ONGLET 2 : Vitesse
+    checkedTires.forEach(t => {
+        if (customDrivers) {
+            for (let i = 1; i <= numDrivers; i++) {
+                if (!document.getElementById(`drv-${i}-time-push-${t}`)?.value) setMissing(`drv-${i}-time-push-${t}`, 'tab-tech');
+            }
+        } else {
+            if (!document.getElementById(`global-time-push-${t}`)?.value) setMissing(`global-time-push-${t}`, 'tab-tech');
+        }
+    });
+
+    // 5. ONGLET 2 : Carburant
+    let fuelStartStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+    let fuelStart = fuelStartStr ? parseFloat(fuelStartStr) : 0;
+
+    if (fuelStart > 0) {
+        if (!document.getElementById('fuel-speed')?.value) setMissing('fuel-speed', 'tab-tech');
+
+        if (customDrivers) {
+            for (let i = 1; i <= numDrivers; i++) {
+                if (!document.getElementById(`drv-${i}-fuel-push`)?.value) setMissing(`drv-${i}-fuel-push`, 'tab-tech');
+            }
+        } else {
+            if (!document.getElementById('cons-push')?.value) setMissing('cons-push', 'tab-tech');
+        }
+    }
+
+    return result;
+}
+
+function navigateToSmartTab() {
+    let scan = checkRequiredFields();
+    if (scan.isValid) {
+        openTab('tab-strategy');
+    } else {
+        openTab(scan.tabId);
+        setTimeout(() => {
+            let el = document.getElementById(scan.firstMissingId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.focus();
+            }
+        }, 150);
+    }
 }
 

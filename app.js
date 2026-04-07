@@ -833,6 +833,11 @@ document.addEventListener('DOMContentLoaded', () => {
         populateJoinDropdown();
         openTab('tab-params');
     }
+    // 🚀 INITIALISATION : Si le sas est vide, on verrouille
+    if (!currentFileName || currentFileName === "") {
+        isEngineerMode = false;
+        toggleObserverMode(true);
+    }
 });
 
 // ==========================================
@@ -916,9 +921,9 @@ function clearCurrentRaceData() {
     updateSnapshotDropdown();
     // 🚀 AJOUT ICI : On coupe l'écoute du cloud si on vide la course
     if (unsubscribeCloud) { unsubscribeCloud(); unsubscribeCloud = null; }
-    // 🚀 ACCUEIL : On force l'interface en vert et ouvert
-    isEngineerMode = true;
-    toggleObserverMode(false);
+    // 🚀 SÉCURITÉ : Aucun nom de course = Mode Viewer par défaut
+    isEngineerMode = false;
+    toggleObserverMode(true);
 }
 
 function openNewRaceModal() {
@@ -991,7 +996,12 @@ async function confirmNewRace() {
     saveFormState();
     toggleObserverMode(false); // Mode Ingénieur visuel
 
-    openTab('tab-params');
+    // 🚀 CRÉATION : Le créateur devient automatiquement Ingénieur
+    isEngineerMode = true;
+    toggleObserverMode(false);
+
+    // On lance le scanner pour guider l'utilisateur
+    if (typeof checkRequiredFields === 'function') checkRequiredFields();
 }
 
 function showJoinDropdown() {
@@ -5223,6 +5233,10 @@ function handleLocalFileSelect(event) {
 
                         // On relance le radar réseau sur la nouvelle course
                         listenToCloudRace();
+                        // 🚀 CRÉATION : Le créateur devient automatiquement Ingénieur
+                        isEngineerMode = true;
+                        toggleObserverMode(false);
+
                         navigateToSmartTab();
 
                         // Message de succès

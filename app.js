@@ -2740,7 +2740,7 @@ function optimizeStrategyFilling() {
     }
 
     // 🔗 3. L'ÉTIREMENT (Survie : Ajout de relais si course trop longue)
-    let safetyStretches = 15;
+    let safetyStretches = 150;
     while (countCurrentLaps() < targetLaps && safetyStretches-- > 0) {
         let lastSplit = strategySplits[strategySplits.length - 1];
 
@@ -3758,7 +3758,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             let pushCap = getStintCapacity(i, split.stints.length - 1, false);
             let ecoCap = getStintCapacity(i, split.stints.length - 1, true);
             let maxPhysicalCap = Math.max(pushCap, ecoCap);
-            let safetyLoop = 20; let hasAddedStints = false;
+            let safetyLoop = 150; let hasAddedStints = false;
 
             while (lapsToAdd > 0 && lastStint.laps >= maxPhysicalCap && safetyLoop-- > 0) {
                 hasAddedStints = true;

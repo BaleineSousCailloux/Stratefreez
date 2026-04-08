@@ -602,14 +602,13 @@ input[type="number"]::-webkit-outer-spin-button {
    ============================================================ */
 #strategy-insufficient-data {
     position: fixed;
-    top: 80px;
+    top: 78px;
     left: 0;
     right: 0;
     bottom: 0;
     background: #1e1e1e !important;
-    margin-top: 20px;
     padding: 20px;
-    z-index: 10;
+    z-index: 8000;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2506,6 +2505,10 @@ svg.live-grey-icon {
     }
 
     #live-standby-overlay {
+        top: 45px;
+    }
+
+    #strategy-insufficient-data {
         top: 45px;
     }
 

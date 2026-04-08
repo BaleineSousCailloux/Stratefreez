@@ -4423,14 +4423,14 @@ function renderStrategy() {
                     if (!isMet) isGlobalObjectiveMet = false;
                     let colClass = isMet ? 'text-success' : 'text-danger';
                     let msg = `🏁 Fin de course : ${formatTime(splitEndSec)} (Cible: ${formatTime(totalSecRace)})`;
-                    goalHTML = `<strong class="${colClass}">${msg}</strong>`;
+                    goalHTML = `<strong class="${colClass} goal-line-text">${msg}</strong>`;
                 } else {
                     let targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
                     let isMet = split.stints[split.stints.length - 1].endLap >= targetLaps;
                     if (!isMet) isGlobalObjectiveMet = false;
                     let colClass = isMet ? 'text-success' : 'text-danger';
                     let msg = `🏁 Objectif de course : ${split.stints[split.stints.length - 1].endLap} / ${targetLaps} tours`;
-                    goalHTML = `<strong class="${colClass}">${msg}</strong>`;
+                    goalHTML = `<strong class="${colClass} goal-line-text">${msg}</strong>`;
                 }
             }
         }

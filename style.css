@@ -602,7 +602,7 @@ input[type="number"]::-webkit-outer-spin-button {
    ============================================================ */
 #strategy-insufficient-data {
     position: fixed;
-    top: 78px;
+    top: 80px;
     left: 0;
     right: 0;
     bottom: 0;
@@ -886,6 +886,10 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .stint-table tr.active-stint td.zone-end {
     background-color: #0f395c;
+}
+
+.goal-line-text {
+    font-size: 1.3em !important;
 }
 
 /* ============================================================
@@ -2505,11 +2509,11 @@ svg.live-grey-icon {
     }
 
     #live-standby-overlay {
-        top: 45px;
+        top: 47px;
     }
 
     #strategy-insufficient-data {
-        top: 45px;
+        top: 47px;
     }
 
     #btn-giant-start {

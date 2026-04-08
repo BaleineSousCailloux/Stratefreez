@@ -2593,7 +2593,7 @@ function getDriverFuelRate(driverName, strat) {
         let val = parseFloat(document.getElementById(`drv-${drvIndex}-fuel-${strat}`)?.value?.replace(/[^\d.]/g, ''));
         if (!isNaN(val)) return val;
     }
-    return parseFloat(document.getElementById(`cons-${strat}`)?.value?.replace(/[^\d.]/g, '')) || 3.0;
+    return parseFloat(document.getElementById(`cons-${strat}`)?.value?.replace(/[^\d.]/g, '')) || 10.0;
 }
 
 function getDriverLapSeconds(driverName, tire, strat) {
@@ -2606,7 +2606,7 @@ function getDriverLapSeconds(driverName, tire, strat) {
         timeStr = document.getElementById(`drv-${drvIndex}-time-${strat}-${tire}`)?.value;
     }
     if (!timeStr) timeStr = document.getElementById(`global-time-${strat}-${tire}`)?.value;
-    if (!timeStr) return 120000; // 🚀 120s = 120000 ms
+    if (!timeStr) return 60000;
 
     let parts = timeStr.split(':');
     if (parts.length === 2) {
@@ -2614,7 +2614,7 @@ function getDriverLapSeconds(driverName, tire, strat) {
     } else if (parts.length === 3) {
         return (parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])) * 1000; // 🚀 MS
     }
-    return 120000; // 🚀 MS
+    return 60000; // 🚀 MS
 }
 
 function getDriverTireLife(driverName, tire) {
@@ -3755,8 +3755,12 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
             let lapsToAdd = missingLaps > 0 ? missingLaps : (missingSec > 0 ? Math.ceil(missingSec / lsTime) : 0);
             let lastStint = split.stints[split.stints.length - 1];
+
+            // 🚀 LE FIX : On demande la permission au détecteur avant d'imaginer une capacité Éco !
+            let canUseEcoExt = hasEcoData(split.driver);
             let pushCap = getStintCapacity(i, split.stints.length - 1, false);
-            let ecoCap = getStintCapacity(i, split.stints.length - 1, true);
+            let ecoCap = canUseEcoExt ? getStintCapacity(i, split.stints.length - 1, true) : 0;
+
             let maxPhysicalCap = Math.max(pushCap, ecoCap);
             let safetyLoop = 150; let hasAddedStints = false;
 
@@ -3764,8 +3768,11 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 hasAddedStints = true;
                 split.stints.push({ tire: lastStint.tire, fuelStrat: 'push', laps: 1, changeTires: true, isPitted: false, lockedTimeSec: null, manualFuel: null });
                 let newStintIdx = split.stints.length - 1;
+
                 let newPushCap = getStintCapacity(i, newStintIdx, false);
-                let newEcoCap = getStintCapacity(i, newStintIdx, true);
+                // 🚀 LE FIX (suite) : Et on fait pareil pour les nouveaux relais générés !
+                let newEcoCap = canUseEcoExt ? getStintCapacity(i, newStintIdx, true) : 0;
+
                 let newMaxCap = Math.max(newPushCap, newEcoCap);
                 let lapsForThisStint = Math.min(lapsToAdd, newMaxCap);
                 split.stints[newStintIdx].laps = lapsForThisStint;

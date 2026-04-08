@@ -459,16 +459,16 @@
                 <div class="d-flex gap-20 flex-wrap mt-20">
 
                     <div class="export-card border-danger flex-1 min-w-300">
-                        <h3 class="modal-title-red w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2">content_copy</span> Dupliquer la course</h3>
+                        <h3 class="modal-title-red w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2 mr-8">content_copy</span> Dupliquer la course</h3>
                         <input type="text" id="save-config-name" class="export-input mh-40" placeholder="Nouveau nom de course">
                         <button class="action-btn magic-btn w-100 mh-40 mt-auto" onclick="duplicateRace()">Créer une copie</button>
                     </div>
 
                     <div class="export-card bg-success-light border-success flex-1 min-w-300">
-                        <h3 class="text-success w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2">photo_camera</span> Instantanés</h3>
+                        <h3 class="text-success w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2 mr-8">photo_camera</span> Instantanés</h3>
 
                         <div class="w-100 mt-15 mb-15 text-center">
-                            <select id="snapshot-select" class="table-select w-100 mh-40 hidden" onchange="restoreSnapshot(this.value)">
+                            <select id="snapshot-select" class="mh-40 hidden" onchange="restoreSnapshot(this.value)">
                                 <option value="">-- Charger un instantané --</option>
                             </select>
                             <p id="no-snapshot-msg" class="help-text m-0 mt-5">Aucun instantané disponible.</p>

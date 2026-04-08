@@ -512,7 +512,6 @@ input[type="number"]::-webkit-outer-spin-button {
     padding: 10px 12px;
     margin-bottom: 6px;
     border-radius: 6px;
-    background: #333;
     cursor: pointer;
     transition: transform 0.2s ease, background 0.2s ease;
     color: #fff;
@@ -523,7 +522,6 @@ input[type="number"]::-webkit-outer-spin-button {
 }
     .race-list-item:hover {
         transform: scale(1.1); /* Grossissement fluide de 5% (10% casse souvent les bordures sur mobile) */
-        background: #444;
     }
 
 .multi-input-group {

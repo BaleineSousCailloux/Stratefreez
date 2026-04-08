@@ -76,7 +76,7 @@
                     <div class="multi-input-group">
                         <div class="input-cell">
                             <label class="sub-label">Nom de l'épreuve</label>
-                            <input type="text" id="race-name-input" placeholder="Aucune course active" disabled>
+                            <input type="text" id="race-name-input" placeholder="Aucune course active" maxlength="45" disabled>
                         </div>
                         <div class="input-cell">
                             <label class="sub-label">Voiture</label>
@@ -457,7 +457,7 @@
 
                     <div class="export-card border-danger flex-1 min-w-300">
                         <h3 class="modal-title-red w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2 mr-8">content_copy</span> Dupliquer la course</h3>
-                        <input type="text" id="save-config-name" class="export-input mh-40" placeholder="Nouveau nom de course">
+                        <input type="text" id="save-config-name" class="export-input mh-40" placeholder="Nouveau nom de course" maxlength="45">
                         <button class="action-btn magic-btn w-100 mh-40 mt-auto" onclick="duplicateRace()">Créer une copie</button>
                     </div>
 
@@ -657,10 +657,10 @@
         </div>
     </div>
     <div id="join-race-list-modal" class="modal hidden">
-        <div class="modal-content border-top-success modal-wide" style="padding: 20px;">
-            <h3 class="modal-title-green" style="margin-bottom: 15px;">COURSES DISPONIBLES</h3>
+        <div class="modal-content border-top-success modal-wide">
+            <h3 class="modal-title-green mb-15">COURSES DISPONIBLES</h3>
 
-            <div id="join-race-list-content" class="text-left" style="max-height: 50vh; overflow-y: auto; margin-bottom: 20px;">
+            <div id="join-race-list-content" class="text-left join-race-list-scroll">
             </div>
 
             <div class="justify-space-around d-flex mt-20">

@@ -519,8 +519,8 @@ function loadConfig(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // On stocke juste le nom, mais on ne l'injecte pas encore dans l'interface
-    let fileName = file.name.replace(/\.[^/.]+$/, "");
+    // On stocke juste le nom, limité à 45 caractères, mais on ne l'injecte pas encore dans l'interface
+    let fileName = file.name.replace(/\.[^/.]+$/, "").substring(0, 45);
 
     const reader = new FileReader();
     reader.onload = async function (e) {

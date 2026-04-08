@@ -3806,8 +3806,17 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 let newEcoCap = canUseEcoExt ? getStintCapacity(i, newStintIdx, 'eco') : 0;
 
                 let newMaxCap = Math.max(newPushCap, newEcoCap);
+
                 let lapsForThisStint = Math.min(lapsToAdd, newMaxCap);
+
+                // 🚀 LE FIX : Si les tours injectés dépassent la capacité Attack, 
+                // on corrige l'étiquette en Éco dès la naissance du relais !
+                if (canUseEcoExt && lapsForThisStint > newPushCap) {
+                    split.stints[newStintIdx].fuelStrat = 'eco';
+                }
+
                 split.stints[newStintIdx].laps = lapsForThisStint;
+
                 lapsToAdd -= lapsForThisStint;
                 lastStint = split.stints[newStintIdx];
                 maxPhysicalCap = newMaxCap;

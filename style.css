@@ -48,7 +48,7 @@ body {
 .sticky-header {
     position: sticky;
     top: 0;
-    z-index: 1000;
+    z-index: 8500;
     background-color: #1e1e1e;
     border-bottom: 2px solid #cc2d53;
 }

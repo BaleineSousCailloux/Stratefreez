@@ -48,7 +48,7 @@ body {
 .sticky-header {
     position: sticky;
     top: 0;
-    z-index: 1000;
+    z-index: 8500;
     background-color: #1e1e1e;
     border-bottom: 2px solid #cc2d53;
 }
@@ -62,12 +62,12 @@ body {
         height: 20px;
         background: linear-gradient(to bottom, #1e1e1e, rgba(30, 30, 30, 0));
         pointer-events: none;
-        z-index: 999;
+        z-index: 8499;
     }
 
 .navbar {
     position: relative;
-    z-index: 8500;
+    z-index: 8501;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2441,7 +2441,6 @@ svg.live-grey-icon {
         padding: 10px 0;
         border-bottom: 2px solid #cc2d53;
         box-shadow: 0 10px 15px rgba(0,0,0,0.5);
-        z-index: 8501;
     }
 
         .nav-links.show-menu {

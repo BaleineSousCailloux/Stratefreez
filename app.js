@@ -17,6 +17,7 @@ let lastActiveStint = localStorage.getItem('lastActiveStint') || null;
 // 🚀 NOUVEAU : Empreinte d'état (Remplace le boolean needsStrategyUpdate)
 let lastCalculatedState = null;
 let liveStandbyTimeout = null;
+let isFirstStrategyBuilt = false;
 let isFlashMessageAlive = false; // Permet au chrono de savoir si un message bloque la zone
 
 // ==========================================
@@ -161,10 +162,6 @@ function saveFormState() {
     });
     localStorage.setItem('stratefreez-form-state', JSON.stringify(state));
     localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
-    /*setSaveBadge(false);*/
-
-    // 🚀 NOUVEAU : On délègue à l'amortisseur Cloud
-    triggerCloudSync();
 }
 
 // 🚀 FINI LE MINUTEUR, on supprime globalSaveTimeout
@@ -651,6 +648,10 @@ function applyFormStateToDOM(state) {
         // Désactivation du bouclier (la page est prête)
         window.isInitializingDOM = false;
     }
+    // 🚀 RESTAURE LE FORMATAGE VISUEL APRES INJECTION DU CLOUD
+    document.querySelectorAll('.format-hhmm, .format-liters, .format-lps, .format-lpt, .format-sec, .format-mss000').forEach(input => {
+        if (input.value !== '') input.dispatchEvent(new Event('blur'));
+    });
 }
 
 // ==========================================
@@ -666,23 +667,29 @@ let unsubscribeCloud = null;
 let isEngineerMode = false; // Sera défini dynamiquement selon la course
 
 function triggerCloudSync() {
-    // 🛡️ PROTECTIONS : Pas de course ? Pas ingénieur ? Hors-ligne ? On bloque l'envoi !
     if (!currentRaceId || !isRaceActive || !isEngineerMode || !navigator.onLine) return;
 
-    // 🚀 LA VOIE RAPIDE : Envoi atomique et immédiat à la milliseconde près !
-    // (Fini le setTimeout de 800ms)
+    // 🚀 LE VERROU : On n'envoie RIEN au Cloud tant que le 1er tableau n'est pas généré !
+    if (!isFirstStrategyBuilt) return;
+
     let stateStr = localStorage.getItem('stratefreez-form-state');
     let stratStr = localStorage.getItem('stratefreez-data');
     let timerStr = localStorage.getItem('stratefreez-timer');
     let timerState = timerStr ? JSON.parse(timerStr) : null;
+    let raceName = document.getElementById('race-name-input')?.value || "Course sans nom";
 
-    db.collection('races').doc(currentRaceId).update({
+    // 🚀 MAGIE : set({merge: true}) crée la course sur le Cloud si elle n'existe pas, ou la met à jour !
+    db.collection('races').doc(currentRaceId).set({
+        id: currentRaceId,
+        pin: currentRacePin,
+        name: raceName,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         formState: stateStr ? JSON.parse(stateStr) : {},
         strategyData: stratStr ? JSON.parse(stratStr) : [],
         timerState: timerState,
-        isTimerRunning: timerState ? timerState.active : false
-    }).catch(err => console.error("Erreur de synchro Cloud :", err));
+        isTimerRunning: timerState ? timerState.active : false,
+        isActive: true
+    }, { merge: true }).catch(err => console.error("Erreur de synchro Cloud :", err));
 }
 
 // Nettoie l'envoi Cloud de l'ancienne fonction saveFormState
@@ -825,6 +832,9 @@ document.addEventListener('DOMContentLoaded', () => {
         isEngineerMode = false;
         toggleObserverMode(true);
     }
+    // 🚀 ÉCOUTE GLOBALE DES MODIFICATIONS (Onglets 1 & 2)
+    document.getElementById('form-params')?.addEventListener('change', processGlobalDataChange);
+    document.getElementById('form-tech')?.addEventListener('change', processGlobalDataChange);
 });
 
 // ==========================================
@@ -939,40 +949,27 @@ async function confirmNewRace() {
         return;
     }
 
-    // 🚀 VIDEUR STRICT
     let isTaken = await isRaceNameTaken(raceName);
     if (isTaken) {
         if (errorEl) { errorEl.innerText = "Ce nom existe déjà sur le Cloud."; errorEl.classList.remove('hidden'); }
         return;
     }
 
-    if (errorEl) errorEl.classList.add('hidden'); // On cache l'erreur si tout va bien
+    if (errorEl) errorEl.classList.add('hidden');
 
     clearCurrentRaceData();
-    // ... la suite reste identique
     if (typeof purgeLocalState === 'function') purgeLocalState();
 
-    currentRaceId = 'race_' + Date.now();
+    // 🚀 NAISSANCE LOCALE PURE : L'app génère ses IDs mais n'appelle pas Firebase
+    currentRaceId = db.collection('races').doc().id;
     currentRacePin = Math.floor(1000 + Math.random() * 9000).toString();
     isRaceActive = true;
+    isFirstStrategyBuilt = false; // 🚀 VERROU CLOUD FERMÉ
 
     localStorage.setItem('stratefreez-current-race-id', currentRaceId);
     localStorage.setItem('stratefreez-current-race-pin', currentRacePin);
     localStorage.setItem('stratefreez-is-race-active', 'true');
-
-    // 🚀 PASSEPORT : Le créateur obtient le passeport à vie pour CETTE course
-    isEngineerMode = true;
     localStorage.setItem(`stratefreez-passport-${currentRaceId}`, 'true');
-
-    // Création initiale pure dans Firebase
-    db.collection('races').doc(currentRaceId).set({
-        id: currentRaceId,
-        pin: currentRacePin,
-        name: raceName,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        isActive: true,
-        isTimerRunning: false
-    }).catch(err => console.error(err));
 
     closeNewRaceModal();
     document.getElementById('race-name-input').value = raceName;
@@ -981,13 +978,10 @@ async function confirmNewRace() {
     updateDynamicFields();
     updatePinDisplay();
     saveFormState();
-    toggleObserverMode(false); // Mode Ingénieur visuel
 
-    // 🚀 CRÉATION : Le créateur devient automatiquement Ingénieur
     isEngineerMode = true;
     toggleObserverMode(false);
 
-    // On lance le scanner pour guider l'utilisateur
     if (typeof checkRequiredFields === 'function') checkRequiredFields();
 }
 
@@ -1152,6 +1146,29 @@ function listenToCloudRace() {
         if (doc.exists) {
             const data = doc.data();
 
+            // 🚀 GESTION DU VERROU CLOUD POUR LE BOUTON FLASH
+            let flashBtn = document.getElementById('btn-flash-msg');
+            if (flashBtn) {
+                let now = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0);
+
+                if (data.flashLockUntil && data.flashLockUntil > now) {
+                    // Le verrou est actif : on cache le bouton
+                    flashBtn.classList.add('hidden');
+
+                    // Sécurité locale : on le réaffichera automatiquement quand le temps sera écoulé
+                    // (au cas où il n'y a pas d'autre mise à jour Firebase entre temps)
+                    setTimeout(() => {
+                        let freshNow = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0);
+                        if ((!data.flashLockUntil || data.flashLockUntil <= freshNow) && isEngineerMode) {
+                            flashBtn.classList.remove('hidden');
+                        }
+                    }, data.flashLockUntil - now);
+                } else {
+                    // Le verrou est levé : on affiche le bouton (uniquement pour les ingénieurs)
+                    if (isEngineerMode) flashBtn.classList.remove('hidden');
+                }
+            }
+
             // 1. SÉCURITÉ DE SAISIE (Empêche le clavier de se fermer)
             let activeEl = document.activeElement;
             let isTyping = activeEl && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName);
@@ -1175,9 +1192,15 @@ function listenToCloudRace() {
                 }
             }
             // 🚀 3 RÉCEPTION DU MESSAGE FLASH
-            if (data.currentMessage && data.currentMessage.text) {
+            if (data.flashMessage && data.flashMessage.text) {
                 const now = getUnifiedTime();
-                const msgAge = now - data.currentMessage.timestamp;
+
+                // 🚀 FIX : Conversion du Timestamp Firebase en millisecondes
+                let msgTime = data.flashMessage.timestamp ?
+                    (typeof data.flashMessage.timestamp.toMillis === 'function' ? data.flashMessage.timestamp.toMillis() : data.flashMessage.timestamp)
+                    : now;
+
+                const msgAge = now - msgTime;
                 const remainingTime = 45000 - msgAge;
 
                 if (remainingTime > 0) {
@@ -1185,13 +1208,12 @@ function listenToCloudRace() {
                     let overlay = document.getElementById('flash-alert-overlay');
                     let textEl = document.getElementById('flash-alert-text');
 
-                    if (textEl.innerText !== data.currentMessage.text) {
-                        textEl.innerText = data.currentMessage.text;
+                    if (textEl.innerText !== data.flashMessage.text) {
+                        textEl.innerText = data.flashMessage.text;
                         overlay.classList.remove('hidden');
                     }
 
-                    // ⏱️ AUTO-FERMETURE LOCALE : 
-                    // On programme la disparition et le retour du bouton au millième de seconde près
+                    // ⏱️ AUTO-FERMETURE LOCALE
                     clearTimeout(window.flashTimeout);
                     window.flashTimeout = setTimeout(() => {
                         isFlashMessageAlive = false;
@@ -1202,7 +1224,7 @@ function listenToCloudRace() {
                         // Nettoyage Cloud par l'ingénieur
                         if (isEngineerMode) {
                             db.collection('races').doc(currentRaceId).update({
-                                currentMessage: firebase.firestore.FieldValue.delete()
+                                flashMessage: firebase.firestore.FieldValue.delete()
                             }).catch(e => { });
                         }
                     }, remainingTime);
@@ -1213,7 +1235,7 @@ function listenToCloudRace() {
                     document.getElementById('flash-alert-overlay').classList.add('hidden');
                     if (isEngineerMode) {
                         db.collection('races').doc(currentRaceId).update({
-                            currentMessage: firebase.firestore.FieldValue.delete()
+                            flashMessage: firebase.firestore.FieldValue.delete()
                         }).catch(e => { });
                     }
                 }
@@ -1665,14 +1687,39 @@ function generateDriverCardHTML(index, name) {
 function toggleTireOptions(id) {
     const isChecked = document.getElementById(`use-${id}`)?.checked;
     document.getElementById(`options-${id}`).classList.toggle('hidden', !isChecked);
+
     if (!isChecked) {
         document.querySelectorAll(`#options-${id} input`).forEach(inp => {
             if (inp.type === 'checkbox') inp.checked = false;
             else { inp.value = ''; handleTireValue(inp); }
         });
+
+        // 🚀 LE NETTOYEUR : Modification à la source
+        let availableTires = getAvailableTires();
+        let fallbackTire = availableTires.length > 0 ? availableTires[0] : 'T';
+        let hasGhostTires = false;
+
+        if (strategySplits && strategySplits.length > 0) {
+            strategySplits.forEach(split => {
+                split.stints.forEach(stint => {
+                    if (stint.tire === id) {
+                        stint.tire = fallbackTire;
+                        hasGhostTires = true;
+                    }
+                });
+            });
+
+            if (hasGhostTires) {
+                cascadeFixPitWindows();
+                saveFormState();
+                if (!document.getElementById('tab-strategy').classList.contains('hidden')) {
+                    renderStrategy();
+                }
+                triggerCloudSync();
+            }
+        }
     }
     syncTiresVisibility();
-    // 🚀 NOUVEAU : Application du clavier sur les champs de règlement pneus fraîchement dévoilés
     applyMobileNumericKeypad();
 }
 
@@ -1953,7 +2000,17 @@ function timerTick() {
     // 🚀 Met à jour l'apparition/disparition du bouton Flash
     evaluateFlashButtonState();
 }
+function processGlobalDataChange() {
+    if (!isEngineerMode) return; // 🚀 CORRECTION : Utilise la vraie variable
 
+    saveFormState(); // A. Sauvegarde Locale
+
+    if (isFirstStrategyBuilt && checkRequiredFields().isValid) {
+        if (typeof cascadeFixPitWindows === 'function') cascadeFixPitWindows();
+        renderStrategy(); // B. Calcul & Affichage
+        triggerCloudSync(); // C. Envoi global propre
+    }
+}
 function updateLiveSpotter(elapsed, timerState) {
     const offlineMsg = document.getElementById('live-offline-msg');
     const dashboard = document.getElementById('live-dashboard');
@@ -4161,6 +4218,28 @@ function renderStrategy() {
         updateAlertVisibility();
         return; // STOP. On ne calcule pas le tableau fantôme.
     }
+    // 🚀 LA PREMIÈRE GÉNÉRATION EST VALIDÉE
+    let wasFirstBuild = !isFirstStrategyBuilt;
+    isFirstStrategyBuilt = true;
+
+    if (wasFirstBuild) {
+        triggerCloudSync(); // 🚀 Envoie instantanément la coquille parfaite au Cloud !
+        // 🚀 NOTIFICATION VISUELLE (Utilise le bandeau existant)
+        let banner = document.getElementById('end-race-banner');
+        let raceName = document.getElementById('race-name-input')?.value || "La course";
+        if (banner) {
+            let oldText = banner.innerText;
+            let oldBg = banner.style.background;
+            banner.innerText = `✅ ${raceName} générée et partagée sur le Cloud !`;
+            banner.style.background = "#2196F3";
+            banner.classList.remove('hidden');
+            setTimeout(() => {
+                banner.classList.add('hidden');
+                banner.style.background = oldBg;
+                banner.innerText = oldText;
+            }, 4000);
+        }
+    }
 
     // Feu vert : On cache l'erreur et on génère le tableau
     container.classList.remove('hidden');
@@ -5341,35 +5420,50 @@ function applyMobileNumericKeypad() {
 // ==========================================
 
 function openFlashInput() {
-    if (!isEngineerMode) return;
-    document.getElementById('flash-msg-input').value = '';
-    document.getElementById('flash-char-count').innerText = '0';
+    if (!currentRaceId || !isEngineerMode) return;
+
     document.getElementById('flash-input-modal').classList.remove('hidden');
-    setTimeout(() => document.getElementById('flash-msg-input').focus(), 50);
+    document.getElementById('flash-msg-input').value = ""; // Remise à zéro propre
+
+    // 🚀 VERROU A : Bloque le bouton chez tous les ingénieurs pendant 45s
+    let lockExpiry = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0) + 45000;
+
+    db.collection('races').doc(currentRaceId).set({
+        flashLockUntil: lockExpiry
+    }, { merge: true }).catch(err => console.error("Erreur Verrou Flash:", err));
 }
 
 function closeFlashInput() {
     document.getElementById('flash-input-modal').classList.add('hidden');
+
+    if (!currentRaceId || !isEngineerMode) return;
+
+    // 🚀 VERROU B1 : Annule le blocage instantanément (Timer à 0)
+    db.collection('races').doc(currentRaceId).set({
+        flashLockUntil: 0
+    }, { merge: true }).catch(err => console.error("Erreur Déverrouillage Flash:", err));
 }
 
 function sendFlashMessage() {
-    if (!isEngineerMode || !currentRaceId) return;
+    let inputEl = document.getElementById('flash-msg-input');
+    let msg = inputEl ? inputEl.value.trim() : "";
 
-    let text = document.getElementById('flash-msg-input').value.trim();
-    if (!text) return;
+    if (!msg || !currentRaceId || !isEngineerMode) return;
 
-    // 🚀 ANTI-SPAM : On cache le bouton localement et on déclare le message vivant
-    isFlashMessageAlive = true;
-    evaluateFlashButtonState();
+    closeFlashInput(); // Ferme la modale et prépare le terrain
 
-    db.collection('races').doc(currentRaceId).update({
-        currentMessage: {
-            text: text,
-            timestamp: getUnifiedTime() // Heure atomique de naissance
+    // 🚀 VERROU B2 & ENVOI CIBLÉ : Écrit UNIQUEMENT dans la course en cours + Relance 45s
+    let lockExpiry = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0) + 45000;
+
+    db.collection('races').doc(currentRaceId).set({
+        flashLockUntil: lockExpiry,
+        flashMessage: {
+            text: msg,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
         }
-    }).catch(e => console.error("Erreur Flash:", e));
+    }, { merge: true }).catch(err => console.error("Erreur Envoi Flash:", err));
 
-    closeFlashInput();
+    if (inputEl) inputEl.value = ""; // Nettoyage
 }
 
 function dismissFlashLocal() {

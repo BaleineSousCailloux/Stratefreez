@@ -48,7 +48,7 @@ body {
 .sticky-header {
     position: sticky;
     top: 0;
-    z-index: 8500;
+    z-index: 1000;
     background-color: #1e1e1e;
     border-bottom: 2px solid #cc2d53;
 }
@@ -66,6 +66,8 @@ body {
     }
 
 .navbar {
+    position: relative;
+    z-index: 8500;
     display: flex;
     align-items: center;
     justify-content: space-between;

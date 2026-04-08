@@ -154,6 +154,8 @@ body {
 #race-selection-block {
     display: flex;
     flex-wrap: wrap;
+    margin-left: 5px;
+    margin-right: 5px;
     gap: 10px !important;
 }
 
@@ -1471,6 +1473,12 @@ select:disabled, input:disabled, .locked-sim {
     max-width: 100%; /* 🚀 Sécurité : l'empêche de déborder sur mobile */
     margin: 0 auto; /* 🚀 Le centre horizontalement */
     display: block; /* 🚀 Nécessaire pour que le margin auto fonctionne */
+    appearance: none; /* 🚀 Fait disparaître la flèche native */
+    -webkit-appearance: none; /* 🚀 Pour Safari / anciens Chrome */
+    -moz-appearance: none; /* 🚀 Pour Firefox */
+    text-align: center; /* 🚀 Force le texte à rester bien au centre */
+    cursor: pointer; /* 🚀 Garde le curseur de la main au survol */
+    padding: 5px 15px; /* 🚀 Équilibre l'espace interne (optionnel) */
 }
 
 .ia-textarea {

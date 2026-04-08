@@ -2622,9 +2622,10 @@ function getDriverTireLife(driverName, tire) {
     let drivers = parseInt(document.getElementById('num-drivers').value) || 1;
     if (drivers > 1 && document.getElementById('personalize-drivers-toggle')?.checked) {
         let val = parseInt(document.getElementById(`drv-${drvIndex}-life-${tire}`)?.value);
-        if (!isNaN(val)) return val;
+        if (!isNaN(val) && val > 0) return val;
     }
-    return parseInt(document.getElementById(`global-life-${tire}`)?.value) || 999;
+    // 🚀 LOGIQUE PURE : 0 = Case vide = Usure désactivée
+    return parseInt(document.getElementById(`global-life-${tire}`)?.value) || 0;
 }
 
 function timeStringToSeconds(str) {
@@ -2664,11 +2665,27 @@ function optimizeStrategyFilling() {
     let isSolo = (parseInt(document.getElementById('num-drivers')?.value) === 1);
     let hasPitWindow = document.getElementById('enable-pit-window')?.checked;
 
-    // 🛠️ HELPER : Le Plafond Physique
+    // 🛠️ HELPER : Le Plafond Physique (Entonnoir à l'Infini)
     const getCeiling = (driver, tire) => {
         let tLife = getDriverTireLife(driver, tire);
+        let hasTireLimit = tLife > 0;
+
+        let rawFuelStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+        let isFuelEnabledLocal = (rawFuelStr ? parseFloat(rawFuelStr) : 0) > 0;
+
+        // Voie D : Mode Arcade (Aucune limite)
+        if (!hasTireLimit && !isFuelEnabledLocal) return Infinity;
+
+        // Voie C : Pneus seuls (Pas de conso d'essence)
+        if (!isFuelEnabledLocal) return tLife;
+
         let fRate = getDriverFuelRate(driver, 'push');
         let fLife = Math.floor((100 - safetyRes) / fRate);
+
+        // Voie B : Essence seule (Pneus inusables)
+        if (!hasTireLimit) return Math.max(1, fLife);
+
+        // Voie A : Simulation Totale (Le plus strict des deux)
         return Math.max(1, Math.min(tLife, fLife));
     };
 
@@ -2680,7 +2697,7 @@ function optimizeStrategyFilling() {
         let totalSec = getRaceDurationSeconds();
         let sampleDriver = strategySplits[0]?.driver || getAvailableDrivers()[0];
         let sampleTire = strategySplits[0]?.stints[0]?.tire || tires[0];
-        let avgLapSec = getDriverLapSeconds(sampleDriver, sampleTire, 'push') || 120;
+        let avgLapSec = getDriverLapSeconds(sampleDriver, sampleTire, 'push') || 60000;
         targetLaps = Math.ceil(totalSec / avgLapSec); // Estimation, la cascade ajustera les secondes
     }
 
@@ -3465,34 +3482,47 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
         }
     };
 
-    const getStintCapacity = (sIdx, stIdx, useEco) => {
+    // 🚀 DÉCISION : forceStrat permet d'exiger la capacité d'un mode spécifique (push ou eco)
+    const getStintCapacity = (sIdx, stIdx, forceStrat = null) => {
         let split = strategySplits[sIdx]; let stint = split.stints[stIdx]; let driver = split.driver;
+
+        // 1. Capteur Usure
         let tireLife = getDriverTireLife(driver, stint.tire);
-        let fuelStrat = useEco ? 'eco' : stint.fuelStrat;
+        let hasTireLimit = tireLife > 0;
+
+        let fuelStrat = (forceStrat === 'push' || forceStrat === 'eco') ? forceStrat : stint.fuelStrat;
         let fuelRate = getDriverFuelRate(driver, fuelStrat);
 
-        let usedTireLaps = 0;
-        if (!stint.changeTires && !(sIdx === 0 && stIdx === 0)) {
-            let currS = sIdx, currSt = stIdx - 1;
-            while (currS >= 0) {
-                if (currSt < 0) { currS--; if (currS >= 0) currSt = strategySplits[currS].stints.length - 1; else break; }
-                let checkStint = strategySplits[currS].stints[currSt];
-                usedTireLaps += checkStint.laps;
-                if (checkStint.changeTires || (currS === 0 && currSt === 0)) break;
-                currSt--;
+        // Calcul usure
+        let tireRem = Infinity;
+        if (hasTireLimit) {
+            let usedTireLaps = 0;
+            if (!stint.changeTires && !(sIdx === 0 && stIdx === 0)) {
+                let currS = sIdx, currSt = stIdx - 1;
+                while (currS >= 0) {
+                    if (currSt < 0) { currS--; if (currS >= 0) currSt = strategySplits[currS].stints.length - 1; else break; }
+                    let checkStint = strategySplits[currS].stints[currSt];
+                    usedTireLaps += checkStint.laps;
+                    if (checkStint.changeTires || (currS === 0 && currSt === 0)) break;
+                    currSt--;
+                }
             }
+            let fS = sIdx, fSt = stIdx + 1;
+            while (fS < strategySplits.length) {
+                if (fSt >= strategySplits[fS].stints.length) { fS++; fSt = 0; if (fS >= strategySplits.length) break; }
+                let checkStint = strategySplits[fS].stints[fSt];
+                if (checkStint.changeTires) break;
+                usedTireLaps += checkStint.laps;
+                fSt++;
+            }
+            tireRem = Math.max(0, tireLife - usedTireLaps);
         }
-        let fS = sIdx, fSt = stIdx + 1;
-        while (fS < strategySplits.length) {
-            if (fSt >= strategySplits[fS].stints.length) { fS++; fSt = 0; if (fS >= strategySplits.length) break; }
-            let checkStint = strategySplits[fS].stints[fSt];
-            if (checkStint.changeTires) break;
-            usedTireLaps += checkStint.laps;
-            fSt++;
-        }
-        let tireRem = Math.max(0, tireLife - usedTireLaps);
 
-        // 🚀 FIX : Le moteur comprend que seul le Relais 1 subit le "initialFuel", les autres ont droit à 100L
+        // 2. L'Entonnoir (Voies D et C)
+        if (!hasTireLimit && !isFuelEnabled) return Infinity;
+        if (!isFuelEnabled) return Math.max(1, tireRem);
+
+        // Calcul Essence (Voies B et A)
         let isAbsFirst = (sIdx === 0 && stIdx === 0) || ((isOnline || isSolo) && stIdx === 0);
         let tankCap = 100;
         if (isAbsFirst) {
@@ -3501,8 +3531,10 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             tankCap = parseFloat(stint.manualFuel);
         }
 
-        let fuelRem = isFuelEnabled ? Math.floor((tankCap - safetyRes) / fuelRate) : 999;
-        return Math.max(1, Math.min(tireRem, fuelRem));
+        let fuelRem = Math.floor((tankCap - safetyRes) / fuelRate);
+
+        if (!hasTireLimit) return Math.max(1, fuelRem); // Voie B
+        return Math.max(1, Math.min(tireRem, fuelRem)); // Voie A
     };
 
     for (let i = 0; i < strategySplits.length; i++) {
@@ -3513,25 +3545,27 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
     }
     updateTimeline();
 
+    // 🚀 L'intelligence de clamping (Fini la boucle infinie Attack/Eco)
     for (let i = 0; i < strategySplits.length; i++) {
         for (let j = 0; j < strategySplits[i].stints.length; j++) {
             let stint = strategySplits[i].stints[j];
             if (stint.isPitted) continue;
-            let pushCap = getStintCapacity(i, j, false);
-            if (stint.laps > pushCap) {
-                // On vérifie si l'utilisateur a rempli les cases Éco
-                let canUseEco = hasEcoData(strategySplits[i].driver);
-                let ecoCap = canUseEco ? getStintCapacity(i, j, true) : 0;
 
-                if (canUseEco && ecoCap > pushCap) {
-                    // On a des données Éco et elles permettent de faire plus de tours
+            let currentCap = getStintCapacity(i, j); // Capacité dans son mode ACTUEL
+
+            // Si currentCap est Infinity, on n'entre jamais ici. Parfait !
+            if (stint.laps > currentCap) {
+                let canUseEco = hasEcoData(strategySplits[i].driver);
+                let pushCap = getStintCapacity(i, j, 'push');
+                let ecoCap = canUseEco ? getStintCapacity(i, j, 'eco') : 0;
+
+                if (stint.fuelStrat === 'push' && canUseEco && ecoCap >= stint.laps) {
                     stint.fuelStrat = 'eco';
-                    stint.laps = Math.min(stint.laps, ecoCap);
+                } else if (stint.fuelStrat === 'push' && canUseEco && ecoCap > pushCap) {
+                    stint.fuelStrat = 'eco';
+                    stint.laps = ecoCap;
                 } else {
-                    // Pas de données Éco OU l'Éco ne sauve pas le tour supplémentaire
-                    // On force le mode Attack et on limite les tours à la capacité réelle
-                    stint.fuelStrat = 'push';
-                    stint.laps = pushCap;
+                    stint.laps = currentCap; // Blocage strict
                 }
             }
         }
@@ -3647,7 +3681,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                                 if (isLapMode && winC_lap > 0 && futureEndLap > winC_lap) continue;
                                 if (!isLapMode && secC > 0 && futureEndSec > secC) continue;
                             }
-                            if (stint.laps < getStintCapacity(s, st, false)) { stint.laps++; modified = true; break; }
+                            if (stint.laps < getStintCapacity(s, st)) { stint.laps++; modified = true; break; }
                         }
                         if (modified) break;
                     }
@@ -3670,11 +3704,10 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                                     if (!isLapMode && secC > 0 && futureEndSec > secC) continue;
                                 }
                                 if (stint.fuelStrat !== 'eco') {
-                                    // 🚀 VÉRIFICATION STRICTE
                                     let canUseEco = hasEcoData(strategySplits[s].driver);
                                     if (canUseEco) {
-                                        let pushCap = getStintCapacity(s, st, false);
-                                        let ecoCap = getStintCapacity(s, st, true);
+                                        let pushCap = getStintCapacity(s, st, 'push');
+                                        let ecoCap = getStintCapacity(s, st, 'eco');
                                         if (ecoCap > pushCap && stint.laps < ecoCap) { stint.fuelStrat = 'eco'; stint.laps++; modified = true; break; }
                                     }
                                 }
@@ -3758,8 +3791,8 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
             // 🚀 LE FIX : On demande la permission au détecteur avant d'imaginer une capacité Éco !
             let canUseEcoExt = hasEcoData(split.driver);
-            let pushCap = getStintCapacity(i, split.stints.length - 1, false);
-            let ecoCap = canUseEcoExt ? getStintCapacity(i, split.stints.length - 1, true) : 0;
+            let pushCap = getStintCapacity(i, split.stints.length - 1, 'push');
+            let ecoCap = canUseEcoExt ? getStintCapacity(i, split.stints.length - 1, 'eco') : 0;
 
             let maxPhysicalCap = Math.max(pushCap, ecoCap);
             let safetyLoop = 150; let hasAddedStints = false;
@@ -3769,9 +3802,8 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                 split.stints.push({ tire: lastStint.tire, fuelStrat: 'push', laps: 1, changeTires: true, isPitted: false, lockedTimeSec: null, manualFuel: null });
                 let newStintIdx = split.stints.length - 1;
 
-                let newPushCap = getStintCapacity(i, newStintIdx, false);
-                // 🚀 LE FIX (suite) : Et on fait pareil pour les nouveaux relais générés !
-                let newEcoCap = canUseEcoExt ? getStintCapacity(i, newStintIdx, true) : 0;
+                let newPushCap = getStintCapacity(i, newStintIdx, 'push');
+                let newEcoCap = canUseEcoExt ? getStintCapacity(i, newStintIdx, 'eco') : 0;
 
                 let newMaxCap = Math.max(newPushCap, newEcoCap);
                 let lapsForThisStint = Math.min(lapsToAdd, newMaxCap);
@@ -5165,9 +5197,6 @@ function restoreSnapshot(idx) {
     navigateToSmartTab();
 }
 
-// ==========================================
-// --- SAS DE DÉCONTAMINATION LOCALE ---
-// ==========================================
 // ==========================================
 // --- SAS DE DÉCONTAMINATION LOCALE ---
 // ==========================================

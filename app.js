@@ -703,19 +703,19 @@ function triggerCloudSync() {
 // (Il faut chercher db.collection('races').doc(currentRaceId).set(...) dans saveFormState et le remplacer par triggerCloudSync();)
 
 function toggleObserverMode(isLocked) {
-    // 🚀 PROTECTION ABSOLUE : Impossible d'être spectateur d'une course qui n'existe pas
-    if (!currentRaceId) isLocked = false;
+    // 🚀 PROTECTION ABSOLUE : pas de course, pas d'ingénieur
+    if (!currentRaceId) isLocked = true;
 
     document.body.classList.toggle('observer-locked', isLocked);
     let badge = document.getElementById('save-status-badge');
     if (badge) {
-        // 🚀 ACCUEIL : Si aucune course n'est chargée, on force le Vert
+        // 🚀 ACCUEIL : Si aucune course n'est chargée, on force le Rouge (Verrouillé)
         if (!currentRaceId) {
-            badge.classList.remove('unsaved');
-            badge.classList.add('saved');
-            badge.innerHTML = '<span class="material-symbols-outlined icon-navbar">lock_open</span>';
-            badge.title = "Accueil - Prêt à créer";
-            return; // On s'arrête là
+            badge.classList.remove('saved');
+            badge.classList.add('unsaved'); // Rouge
+            badge.innerHTML = '<span class="material-symbols-outlined icon-navbar">lock</span>'; // Cadenas fermé
+            badge.title = "Aucune course - Interface verrouillée";
+            return;
         }
 
         if (isLocked) {
@@ -5472,9 +5472,13 @@ function checkRequiredFields() {
     let tireWarn = document.getElementById('tire-warning-text');
     if (tireWarn) tireWarn.classList.add('hidden');
 
-    // 🚀 SÉCURITÉ : Si on est sur l'écran d'accueil vide, on s'arrête là (pas de rouge dans le vide)
+    // 🚀 SÉCURITÉ : Si on est sur l'écran d'accueil vide, on s'arrête là (pas de rouge)
+    // MAIS on déclare formellement que les données sont invalides pour bloquer l'onglet 3
     let currentRaceName = document.getElementById('race-name-input')?.value;
-    if (!currentRaceName || currentRaceName === "Aucune course active") return result;
+    if (!currentRaceName || currentRaceName === "Aucune course active") {
+        result.isValid = false;
+        return result;
+    }
 
     const setMissing = (id, tab) => {
         if (!result.firstMissingId) {

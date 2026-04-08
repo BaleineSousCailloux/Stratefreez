@@ -124,17 +124,6 @@ document.addEventListener('change', function (e) {
 });
 
 document.addEventListener('click', function (e) {
-    // 🚀 AXE 1 : Fermeture du menu "Rejoindre" au clic extérieur
-    const joinContainer = document.getElementById('join-race-container');
-    const joinSelect = document.getElementById('join-race-select');
-    const joinBtn = document.getElementById('btn-show-join');
-    if (joinContainer && !joinContainer.contains(e.target)) {
-        if (joinSelect && !joinSelect.classList.contains('hidden')) {
-            joinSelect.classList.add('hidden');
-            joinBtn.classList.remove('hidden');
-            joinSelect.value = "";
-        }
-    }
     let tr = e.target.closest('tr[data-stint]');
     if (tr && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
         document.querySelectorAll('.active-stint').forEach(el => el.classList.remove('active-stint'));
@@ -520,9 +509,6 @@ async function duplicateRace() {
         // 8. Nettoyage de l'interface
         document.getElementById('save-config-name').value = '';
 
-        // On actualise discrètement la liste des courses à rejoindre en arrière-plan
-        populateJoinDropdown();
-
     }).catch(err => {
         console.error("Erreur Duplication Cloud :", err);
         showErrorModal("Erreur de connexion au serveur Firebase.");
@@ -832,7 +818,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- CAS B : NOUVELLE SESSION (Course vierge ou terminée) ---
         clearCurrentRaceData();
         updateDynamicFields();
-        populateJoinDropdown();
         openTab('tab-params');
     }
     // 🚀 INITIALISATION : Si le sas est vide, on verrouille
@@ -1006,120 +991,92 @@ async function confirmNewRace() {
     if (typeof checkRequiredFields === 'function') checkRequiredFields();
 }
 
-function showJoinDropdown() {
-    const btn = document.getElementById('btn-show-join');
-    const select = document.getElementById('join-race-select');
-
-    btn.classList.add('hidden');
-    select.classList.remove('hidden');
-
-    // 🚀 ÉTAPE 2 : Recherche Cloud au moment du clic
-    populateJoinDropdown();
+function openJoinRaceModal() {
+    document.getElementById('join-race-list-modal').classList.remove('hidden');
+    populateJoinRaceList();
 }
 
-// 🚀 NOUVEAU : Fermeture fluide pour les mobiles
-function hideJoinDropdown() {
-    setTimeout(() => {
-        document.getElementById('join-race-select').classList.add('hidden');
-        document.getElementById('btn-show-join').classList.remove('hidden');
-    }, 200);
+function closeJoinRaceModal() {
+    document.getElementById('join-race-list-modal').classList.add('hidden');
 }
 
-// 🚀 FONCTION ASYNCHRONE CLOUD (Les 3 catégories)
-async function populateJoinDropdown() {
-    const select = document.getElementById('join-race-select');
-    select.innerHTML = '<option value="">⏳ Recherche de courses...</option>';
+async function populateJoinRaceList() {
+    const container = document.getElementById('join-race-list-content');
+    container.innerHTML = '<div class="text-center p-20 text-grey">⏳ Recherche des courses sur le Cloud...</div>';
 
     try {
         const snapshot = await db.collection('races').get();
 
         if (snapshot.empty) {
-            select.innerHTML = '<option value="" disabled>Aucune course dans la base</option>';
+            container.innerHTML = '<div class="text-center p-20 text-grey">Aucune course dans la base.</div>';
             return;
         }
 
-        let enCours = [];
-        let pretes = [];
-        let terminees = [];
+        let enCours = []; let pretes = []; let terminees = [];
 
-        // 1. Tri dans les 3 catégories
         snapshot.forEach(doc => {
             let data = doc.data();
-            if (data.id !== currentRaceId) { // Exclut la course actuellement ouverte
-                if (!data.isActive) {
-                    terminees.push(data);
-                } else if (data.isTimerRunning) {
-                    enCours.push(data);
-                } else {
-                    pretes.push(data);
-                }
+            if (data.id !== currentRaceId) {
+                if (!data.isActive) terminees.push(data);
+                else if (data.isTimerRunning) enCours.push(data);
+                else pretes.push(data);
             }
         });
 
-        // 2. Tri par date (le plus récent en haut)
         const sortByDate = (a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0);
-        enCours.sort(sortByDate);
-        pretes.sort(sortByDate);
-        terminees.sort(sortByDate);
+        enCours.sort(sortByDate); pretes.sort(sortByDate); terminees.sort(sortByDate);
 
-        // 3. Construction des balises HTML <optgroup>
-        select.innerHTML = '<option value="">-- Choisir une course --</option>';
-        // 🚀 AJOUT IDÉE 2 : Le bouton de déconnexion / retour à l'accueil
-        select.insertAdjacentHTML('beforeend', '<option value="NEW_SESSION" class="text-success font-weight-bold">🏠 [ + ] FERMER LA SESSION (Retour Accueil)</option>');
+        let html = '';
 
         if (enCours.length > 0) {
-            let groupEnCours = document.createElement('optgroup');
-            groupEnCours.label = "🟢 COURSES EN COURS";
-            enCours.forEach(d => groupEnCours.insertAdjacentHTML('beforeend', `<option value="${d.id}">▶ ${d.name}</option>`));
-            select.appendChild(groupEnCours);
+            html += '<div class="race-list-category">En cours</div>';
+            enCours.forEach(d => html += `<div class="race-list-item" onclick="triggerSwitchRace('${d.id}', '${d.name.replace(/'/g, "\\'")}')"><span class="material-symbols-outlined text-success mr-10">play_arrow</span> ${d.name}</div>`);
         }
-
         if (pretes.length > 0) {
-            let groupPretes = document.createElement('optgroup');
-            groupPretes.label = "🟠 COURSES PRÊTES";
-            pretes.forEach(d => groupPretes.insertAdjacentHTML('beforeend', `<option value="${d.id}">⏸ ${d.name}</option>`));
-            select.appendChild(groupPretes);
+            html += '<div class="race-list-category">En préparation</div>';
+            pretes.forEach(d => html += `<div class="race-list-item" onclick="triggerSwitchRace('${d.id}', '${d.name.replace(/'/g, "\\'")}')"><span class="material-symbols-outlined text-warning mr-10">pause</span> ${d.name}</div>`);
+        }
+        if (terminees.length > 0) {
+            html += '<div class="race-list-category">Terminées</div>';
+            terminees.forEach(d => html += `<div class="race-list-item" onclick="triggerSwitchRace('${d.id}', '${d.name.replace(/'/g, "\\'")}')"><span class="material-symbols-outlined text-danger mr-10">stop</span> ${d.name}</div>`);
         }
 
-        if (terminees.length > 0) {
-            let groupTerminees = document.createElement('optgroup');
-            groupTerminees.label = "🏁 COURSES TERMINÉES";
-            terminees.forEach(d => groupTerminees.insertAdjacentHTML('beforeend', `<option value="${d.id}">▪ ${d.name}</option>`));
-            select.appendChild(groupTerminees);
-        }
+        if (html === '') html = '<div class="text-center p-20 text-grey">Aucune autre course disponible.</div>';
+
+        container.innerHTML = html;
 
     } catch (error) {
-        console.error("Erreur de récupération Firestore :", error);
-        select.innerHTML = '<option value="">-- Erreur de connexion au serveur --</option>';
+        console.error("Erreur Firestore :", error);
+        container.innerHTML = '<div class="text-center p-20 text-danger">Erreur de connexion au serveur</div>';
     }
 }
 
-function triggerSwitchRace(raceId) {
+function triggerSwitchRace(raceId, raceName = "") {
     if (!raceId) return;
 
-    let select = document.getElementById('join-race-select');
-    let btn = document.getElementById('btn-show-join');
-
-    // 🚀 GESTION IDÉE 2 : FERMETURE DE SESSION
-    if (raceId === 'NEW_SESSION') {
-        if (select) { select.value = ""; select.classList.add('hidden'); }
-        if (btn) btn.classList.remove('hidden');
-
-        clearCurrentRaceData();
-        if (typeof purgeLocalState === 'function') purgeLocalState(); // Sécurité : on tue le chrono local
-        openTab('tab-params');
-        return;
-    }
+    // Ferme la liste des courses pour laisser place à l'alerte
+    closeJoinRaceModal();
 
     pendingSwitchRaceId = raceId;
 
-    document.getElementById('switch-race-name').innerText = select.options[select.selectedIndex].text;
-    document.getElementById('switch-race-modal').classList.remove('hidden');
+    let titleEl = document.getElementById('switch-race-modal-title');
+    let descEl = document.getElementById('switch-race-modal-desc');
+    let btnEl = document.getElementById('btn-confirm-switch');
 
-    // On referme le menu immédiatement après le choix
-    select.value = "";
-    select.classList.add('hidden');
-    if (btn) btn.classList.remove('hidden');
+    // 🚀 AIGUILLAGE DYNAMIQUE
+    if (raceId === 'NEW_SESSION') {
+        titleEl.innerText = "⚠️ FERMER LA SESSION";
+        descEl.innerHTML = "Êtes-vous sûr de vouloir fermer la session actuelle et retourner à l'accueil vierge ?";
+        btnEl.innerText = "FERMER SESSION";
+        btnEl.className = "action-btn btn-danger"; // Bouton d'action rouge
+    } else {
+        titleEl.innerText = "⚠️ CHANGEMENT DE COURSE";
+        descEl.innerHTML = `Êtes-vous sûr de vouloir quitter la course actuelle pour charger <strong class="text-warning">${raceName}</strong> ?`;
+        btnEl.innerText = "REJOINDRE";
+        btnEl.className = "action-btn btn-warning"; // Bouton d'action orange
+    }
+
+    document.getElementById('switch-race-modal').classList.remove('hidden');
 }
 
 function cancelSwitchRace() {
@@ -1132,19 +1089,25 @@ async function confirmSwitchRace() {
 
     document.getElementById('switch-race-modal').classList.add('hidden');
 
-    // 1. On purge la course locale actuelle (isEngineerMode devient false ici)
-    clearCurrentRaceData();
+    // 🚀 CAS 1 : Fermeture de session pure
+    if (pendingSwitchRaceId === 'NEW_SESSION') {
+        clearCurrentRaceData();
+        if (typeof purgeLocalState === 'function') purgeLocalState();
+        openTab('tab-params');
+        pendingSwitchRaceId = null;
+        return; // Fin du processus
+    }
 
-    // 2. On configure les identifiants
+    // 🚀 CAS 2 : Changement de course
+    clearCurrentRaceData(); // On purge la course locale actuelle (isEngineerMode devient false ici)
+
     currentRaceId = pendingSwitchRaceId;
     localStorage.setItem('stratefreez-current-race-id', currentRaceId);
 
-    // 🚀 SÉCURITÉ : On arrive TOUJOURS en mode spectateur (Bouclier actif)
-    // Même si on a le passeport, on ne l'active pas tout de suite pour éviter de polluer le Cloud au chargement.
+    // SÉCURITÉ : Mode spectateur actif au chargement
     isEngineerMode = false;
     toggleObserverMode(true);
 
-    // 3. TÉLÉCHARGEMENT INITIAL DEPUIS LE CLOUD
     try {
         const doc = await db.collection('races').doc(currentRaceId).get();
         if (doc.exists) {
@@ -1166,8 +1129,6 @@ async function confirmSwitchRace() {
 
             updatePinDisplay();
             renderStrategy();
-
-            // 4. ON BRANCHE L'ÉCOUTE EN TEMPS RÉEL
             listenToCloudRace();
             navigateToSmartTab();
         } else {

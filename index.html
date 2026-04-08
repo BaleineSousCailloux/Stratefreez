@@ -63,13 +63,10 @@
                 <button class="action-btn magic-btn flex-1 mh-40 min-w-200" onclick="openNewRaceModal()">
                     <span class="material-symbols-outlined icon-align-middle mr-5">add_circle</span> Nouvelle course
                 </button>
-                <div class="flex-1 d-flex min-w-200" id="join-race-container">
-                    <button id="btn-show-join" class="action-btn btn-grey-flex w-100 justify-center mh-40" onclick="showJoinDropdown()">
-                        <span class="material-symbols-outlined icon-align-middle mr-5">login</span> Rejoindre une course
+                <div class="flex-1 d-flex min-w-200">
+                    <button class="action-btn btn-success w-100 justify-center mh-40 flex-center" onclick="openJoinRaceModal()">
+                        <span class="material-symbols-outlined icon-align-middle mr-8">login</span> Rejoindre une course
                     </button>
-                    <select id="join-race-select" class="table-select w-100 hidden mh-40" onchange="triggerSwitchRace(this.value)" onblur="hideJoinDropdown()">
-                        <option value="">-- Choisir une course --</option>
-                    </select>
                 </div>
             </div>
 
@@ -651,11 +648,24 @@
 
     <div id="switch-race-modal" class="modal hidden">
         <div class="modal-content border-top-warning">
-            <h3 class="modal-title-red" style="color: #ffb74d;">⚠️ CHANGEMENT DE COURSE</h3>
-            <p class="modal-confirm-text mt-15 mb-20">Êtes-vous sûr de vouloir quitter la course actuelle pour charger <strong id="switch-race-name" class="text-warning">...</strong> ?</p>
+            <h3 id="switch-race-modal-title" class="modal-title-red" style="color: #ffb74d;">⚠️ CHANGEMENT DE COURSE</h3>
+            <p id="switch-race-modal-desc" class="modal-confirm-text mt-15 mb-20">Êtes-vous sûr de vouloir quitter la course actuelle pour charger <strong id="switch-race-name" class="text-warning">...</strong> ?</p>
             <div class="justify-space-around d-flex">
                 <button class="action-btn btn-grey" onclick="cancelSwitchRace()">Annuler</button>
-                <button class="action-btn btn-warning" onclick="confirmSwitchRace()">REJOINDRE</button>
+                <button id="btn-confirm-switch" class="action-btn btn-warning" onclick="confirmSwitchRace()">REJOINDRE</button>
+            </div>
+        </div>
+    </div>
+    <div id="join-race-list-modal" class="modal hidden">
+        <div class="modal-content border-top-success modal-wide" style="padding: 20px;">
+            <h3 class="modal-title-green" style="margin-bottom: 15px;">COURSES DISPONIBLES</h3>
+
+            <div id="join-race-list-content" class="text-left" style="max-height: 50vh; overflow-y: auto; margin-bottom: 20px;">
+            </div>
+
+            <div class="justify-space-around d-flex mt-20">
+                <button class="action-btn btn-grey" onclick="closeJoinRaceModal()">Annuler</button>
+                <button class="action-btn btn-danger" onclick="triggerSwitchRace('NEW_SESSION')">Fermer la session</button>
             </div>
         </div>
     </div>

@@ -1444,6 +1444,8 @@ select:disabled, input:disabled, .locked-sim {
         align-self: flex-start;
         width: 100%;
         margin-top: 0;
+        display: flex; /* 🚀 RÈGLE L'ALIGNEMENT */
+        align-items: center; /* 🚀 CENTRE VERTICALEMENT */
     }
 
 .export-input {
@@ -1481,8 +1483,6 @@ select:disabled, input:disabled, .locked-sim {
 .btn-import {
     background: #4CAF50;
     border-color: #4CAF50;
-    font-size: 1.1em;
-    padding: 10px 20px;
     width: 100%;
 }
 

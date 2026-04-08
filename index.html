@@ -459,7 +459,7 @@
                 <div class="d-flex gap-20 flex-wrap mt-20">
 
                     <div class="export-card border-danger flex-1 min-w-300">
-                        <h3 class="text-danger w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2">content_copy</span> Dupliquer la course</h3>
+                        <h3 class="modal-title-red w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2">content_copy</span> Dupliquer la course</h3>
                         <input type="text" id="save-config-name" class="export-input mh-40" placeholder="Nouveau nom de course">
                         <button class="action-btn magic-btn w-100 mh-40 mt-auto" onclick="duplicateRace()">Créer une copie</button>
                     </div>
@@ -475,14 +475,14 @@
                         </div>
 
                         <button class="action-btn btn-import w-100 mh-40 mt-auto d-flex align-center justify-center gap-10" onclick="takeSnapshot()">
-                            <span class="material-symbols-outlined">add_a_photo</span> Capturer l'état actuel
+                            <span class="material-symbols-outlined mr-5">add_a_photo</span> Capturer l'état actuel
                         </button>
                     </div>
 
                 </div>
 
                 <h3 class="section-title mt-40"><span class="material-symbols-outlined icon-align-middle mr-8">save</span>SAUVEGARDE LOCALE (.json)</h3>
-                <div class="d-flex flex-wrap justify-space-between align-start">
+                <div class="d-flex flex-wrap justify-space-between">
 
                     <div class="export-card flex-1 min-w-300">
                         <h3 class="modal-title-red w-100 m-0"><span class="material-symbols-outlined icon-align-middle mr-8">download</span>Sauvegarder la course</h3>
@@ -491,7 +491,7 @@
                         <label for="local-save-name" class="w-100 text-left fs-085 text-grey">Course actuellement chargée :</label>
                         <input type="text" id="local-save-name" class="export-input" readonly placeholder="Aucune course..." style="color: #888; background-color: #222; border-color: #444;">
 
-                        <button class="action-btn btn-export-csv w-100 mt-10" onclick="executeLocalSave()">Sauvegarder (.json)</button>
+                        <button class="action-btn magic-btn w-100 mh-40 mt-auto" onclick="executeLocalSave()">Sauvegarder (.json)</button>
                     </div>
 
                     <div class="export-card flex-1 min-w-300">
@@ -499,7 +499,7 @@
                         <p class="help-text text-left mt-10">Charge un ancien fichier JSON. Cela créera instantanément une nouvelle course "Prête" sur le Cloud.</p>
 
                         <input type="file" id="local-load-file" accept=".json" class="hidden" onchange="handleLocalFileSelect(event)">
-                        <button class="action-btn btn-import w-100 mt-auto" onclick="document.getElementById('local-load-file').click()">Parcourir et Charger (.json)</button>
+                        <button class="action-btn btn-import w-100 mh-40 mt-auto" onclick="document.getElementById('local-load-file').click()">Parcourir et Charger (.json)</button>
                     </div>
                 </div>
 
@@ -534,7 +534,7 @@
                     </div>
 
                     <div class="export-card border-danger w-100 mt-20" style="border-style: dashed;">
-                        <h3 class="text-danger w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2">delete_forever</span> Zone de danger</h3>
+                        <h3 class="text-danger w-100 m-0"><span class="material-symbols-outlined icon-align-middle fs-1-2 mr-5">delete_forever</span>Suppression (danger)</h3>
                         <p class="help-text mt-10 mb-15 text-center">Suppression définitive de la course actuelle et de tous ses instantanés.</p>
                         <button class="action-btn btn-danger w-100 mh-40 mt-auto" onclick="openDeleteRaceModal()">SUPPRIMER LA COURSE</button>
                     </div>

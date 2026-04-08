@@ -750,6 +750,7 @@ function handlePadlockClick() {
         if (hasPassport) {
             isEngineerMode = true;
             toggleObserverMode(false); // Déverrouillage instantané !
+            navigateToSmartTab();
         } else {
             // Pas de passeport ? On demande le code PIN
             document.getElementById('pin-auth-input').value = '';
@@ -772,6 +773,7 @@ function confirmPinAuth() {
         localStorage.setItem(`stratefreez-passport-${currentRaceId}`, 'true');
         toggleObserverMode(false);
         closePinAuthModal();
+        navigateToSmartTab(); // 🚀 REDIRECTION INTELLIGENTE
     } else {
         document.getElementById('pin-error-msg').classList.remove('hidden');
     }

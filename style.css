@@ -605,8 +605,7 @@ input[type="number"]::-webkit-outer-spin-button {
     top: 80px;
     left: 0;
     right: 0;
-    bottom;
-    0;
+    bottom: 0;
     background: #1e1e1e !important;
     margin-top: 20px;
     z-index: 10;

@@ -653,9 +653,34 @@ function applyFormStateToDOM(state) {
         // Désactivation du bouclier (la page est prête)
         window.isInitializingDOM = false;
     }
-    // 🚀 RESTAURE LE FORMATAGE VISUEL APRES INJECTION DU CLOUD
-    document.querySelectorAll('.format-hhmm, .format-liters, .format-lps, .format-lpt, .format-sec, .format-mss000').forEach(input => {
-        if (input.value !== '') input.dispatchEvent(new Event('blur'));
+    // 🚀 RESTAURATION VISUELLE SILENCIEUSE (Aucun événement réseau déclenché)
+
+    // 1. Unités (Carburant et Secondes)
+    document.querySelectorAll('.format-liters').forEach(inp => { let val = inp.value.replace(/[^\d.]/g, ''); if (val !== '' && !isNaN(parseFloat(val))) inp.value = parseFloat(val) + " L"; });
+    document.querySelectorAll('.format-lps').forEach(inp => { let val = inp.value.replace(/[^\d.]/g, ''); if (val !== '' && !isNaN(parseFloat(val))) inp.value = parseFloat(val) + " L/s"; });
+    document.querySelectorAll('.format-lpt').forEach(inp => { let val = inp.value.replace(/[^\d.]/g, ''); if (val !== '' && !isNaN(parseFloat(val))) inp.value = parseFloat(val) + " L/t"; });
+    document.querySelectorAll('.format-sec').forEach(inp => { let val = inp.value.match(/(\d+(\.\d+)?)/); if (val) inp.value = val[0] + " s"; });
+
+    // 2. Formatage Temporel (Heures et Chronos)
+    document.querySelectorAll('.format-hhmm').forEach(inp => {
+        let val = inp.value.replace(/\D/g, '');
+        if (val.length >= 3) {
+            let m = val.slice(-2);
+            let h = val.slice(0, -2).padStart(2, '0');
+            inp.value = `${h}:${m}`;
+        } else if (val.length > 0) {
+            inp.value = `${val.padStart(2, '0')}:00`;
+        }
+    });
+
+    document.querySelectorAll('.format-mss000').forEach(inp => {
+        let val = inp.value.replace(/\D/g, '');
+        if (val.length >= 4) {
+            let ms = val.slice(-3);
+            let s = val.slice(-5, -3).padStart(2, '0');
+            let m = val.slice(0, -5) || '0';
+            inp.value = `${m}:${s}.${ms}`;
+        }
     });
 }
 
@@ -3000,6 +3025,7 @@ function updateStintData(splitIdx, stintIdx, field, val) {
 
 // 🚀 NOUVELLE FONCTION : Cible de fenêtre
 function setWindowTarget(splitIdx, target) {
+    if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR AJOUTÉ
     strategySplits[splitIdx].windowTarget = target;
     cascadeFixPitWindows();
     saveFormState();
@@ -4563,8 +4589,11 @@ function renderStrategy() {
                 let startLabelClass = (startIsTarget && split.targetFailed) ? 'text-danger font-weight-bold' : (endIsTarget ? 'text-grey font-weight-bold' : 'font-weight-bold');
                 let endLabelClass = (endIsTarget && split.targetFailed) ? 'text-danger font-weight-bold' : (startIsTarget ? 'text-grey font-weight-bold' : 'font-weight-bold');
 
-                let cbStartInput = endIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'start' : null)" ${startIsTarget ? 'checked' : ''}>`;
-                let cbEndInput = startIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'end' : null)" ${endIsTarget ? 'checked' : ''}>`;
+                // 🚀 VERROUILLAGE VISUEL POUR LES SPECTATEURS
+                let spectatorLock = !isEngineerMode ? 'disabled' : '';
+
+                let cbStartInput = endIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'start' : null)" ${startIsTarget ? 'checked' : ''} ${spectatorLock}>`;
+                let cbEndInput = startIsTarget ? `` : `<input type="checkbox" class="mr-5" onchange="setWindowTarget(${i}, this.checked ? 'end' : null)" ${endIsTarget ? 'checked' : ''} ${spectatorLock}>`;
 
                 let cbStart = `<label class="inline-checkbox-label m-0 ${startLabelClass}">${cbStartInput} Tour ${minLap}</label>`;
                 let cbEnd = `<label class="inline-checkbox-label m-0 ${endLabelClass}">${cbEndInput} Tour ${maxLap}</label>`;

@@ -155,7 +155,7 @@ function saveFormState() {
     if (window.isInitializingDOM) return;
 
     const state = {};
-    document.querySelectorAll('input:not(#pit-modal-lap):not(#undo-pit-modal-lap):not(#fuel-modal-input):not(#stop-timer-input):not(#save-config-name):not(#import-config-file):not(#quick-save-name), select, textarea').forEach(el => {
+    document.querySelectorAll('input:not(#pit-modal-lap):not(#undo-pit-modal-lap):not(#fuel-modal-input):not(#stop-timer-input):not(#save-config-name):not(#import-config-file):not(#quick-save-name), select, textarea:not(#flash-msg-input)').forEach(el => {
         if (el.id && !el.closest('#tab-strategy') && !el.closest('#tab-export')) {
             state[el.id] = el.type === 'checkbox' ? el.checked : el.value;
         }
@@ -619,6 +619,7 @@ function applyFormStateToDOM(state) {
         if (state['has-spotter'] !== undefined) toggleSpotters();
 
         for (const [id, value] of Object.entries(state)) {
+            if (id === 'flash-msg-input') continue; // 🚀 FIX : Ignore les vieux fantômes du Cloud
             const el = document.getElementById(id);
             if (el) {
                 if (el.type === 'checkbox') el.checked = value;
@@ -1208,8 +1209,11 @@ function listenToCloudRace() {
                     let overlay = document.getElementById('flash-alert-overlay');
                     let textEl = document.getElementById('flash-alert-text');
 
-                    if (textEl.innerText !== data.flashMessage.text) {
+                    // 🚀 FIX : On utilise le timestamp unique au lieu du texte pour éviter le bug du F5
+                    let lastTime = textEl.dataset.msgTime || "0";
+                    if (lastTime !== msgTime.toString()) {
                         textEl.innerText = data.flashMessage.text;
+                        textEl.dataset.msgTime = msgTime.toString();
                         overlay.classList.remove('hidden');
                     }
 

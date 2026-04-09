@@ -163,6 +163,9 @@ function saveFormState() {
     });
     localStorage.setItem('stratefreez-form-state', JSON.stringify(state));
     localStorage.setItem('stratefreez-data', JSON.stringify(strategySplits));
+
+    // 🚀 L'ANTENNE GLOBALE EST DE RETOUR !
+    triggerCloudSync();
 }
 
 // 🚀 FINI LE MINUTEUR, on supprime globalSaveTimeout

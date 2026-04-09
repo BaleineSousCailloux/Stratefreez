@@ -758,6 +758,10 @@ function toggleObserverMode(isLocked) {
 
     // 🚀 DYNAMISME : On actualise le scanner visuel au verrouillage/déverrouillage
     if (typeof checkRequiredFields === 'function') checkRequiredFields();
+    // 🚀 FIX : On force le tableau à se redessiner pour verrouiller/déverrouiller physiquement les cases
+    if (isFirstStrategyBuilt && typeof renderStrategy === 'function') {
+        renderStrategy();
+    }
 }
 
 function handlePadlockClick() {

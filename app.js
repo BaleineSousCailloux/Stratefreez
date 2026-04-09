@@ -1480,6 +1480,21 @@ function updateDynamicFields() {
 
     let isSolo = (drivers === 1);
     let isOnline = (raceType === 'online');
+    // 🚀 LOI N°1 : Verrouillage de l'objectif sur "Temps" pour les courses IRL
+    let goalSelect = document.getElementById('race-goal');
+    if (goalSelect) {
+        let lapsOption = goalSelect.querySelector('option[value="laps"]');
+        if (!isSolo && !isOnline) {
+            // Course IRL Multi-pilotes : Forcer le temps et désactiver les tours
+            if (lapsOption) lapsOption.disabled = true;
+            if (goalSelect.value === 'laps') {
+                goalSelect.value = 'time';
+            }
+        } else {
+            // Solo ou Online : Laisser le choix
+            if (lapsOption) lapsOption.disabled = false;
+        }
+    }
 
     let pitWindowCheckbox = document.getElementById('enable-pit-window');
     if (pitWindowCheckbox) {
@@ -2735,10 +2750,23 @@ function optimizeStrategyFilling() {
         targetLaps = parseInt(document.getElementById('race-laps')?.value) || 0;
     } else {
         let totalSec = getRaceDurationSeconds();
-        let sampleDriver = strategySplits[0]?.driver || getAvailableDrivers()[0];
-        let sampleTire = strategySplits[0]?.stints[0]?.tire || tires[0];
-        let avgLapSec = getDriverLapSeconds(sampleDriver, sampleTire, 'push') || 60000;
-        targetLaps = Math.ceil(totalSec / avgLapSec); // Estimation, la cascade ajustera les secondes
+
+        // 🚀 CALCULATEUR THÉORIQUE (Plafond de verre inatteignable)
+        let allDrivers = getAvailableDrivers();
+        let allTires = getAvailableTires();
+        let absoluteFastestLapSec = Infinity;
+
+        for (let d of allDrivers) {
+            for (let t of allTires) {
+                let lapTime = getDriverLapSeconds(d, t, 'push');
+                if (lapTime > 0 && lapTime < absoluteFastestLapSec) {
+                    absoluteFastestLapSec = lapTime;
+                }
+            }
+        }
+        if (absoluteFastestLapSec === Infinity) absoluteFastestLapSec = 60000;
+
+        targetLaps = Math.ceil(totalSec / absoluteFastestLapSec); // Plafond physique absolu
     }
 
     let countCurrentLaps = () => strategySplits.reduce((sum, split) => sum + split.stints.reduce((s, stint) => s + stint.laps, 0), 0);
@@ -2796,33 +2824,135 @@ function optimizeStrategyFilling() {
         });
     }
 
-    // 🔗 3. L'ÉTIREMENT (Survie : Ajout de relais si course trop longue)
-    let safetyStretches = 150;
-    while (countCurrentLaps() < targetLaps && safetyStretches-- > 0) {
-        let lastSplit = strategySplits[strategySplits.length - 1];
+    // 🔗 3. L'ÉTIREMENT (Le Cerveau de Survie)
 
-        let newStint = {
-            tire: tires[0], // Nait en Tendre
-            fuelStrat: 'push',
-            laps: 1,
-            changeTires: true,
-            isPitted: false,
-            lockedTimeSec: null,
-            manualFuel: null
-        };
-        lastSplit.stints.push(newStint);
+    // 🚀 LOI N°1 : Le Coupe-Circuit IRL (On désactive l'usine si ce n'est ni Solo ni Online)
+    if (isSolo || isOnline) {
+        let safetyStretches = 150;
+        let totalSecRace = getRaceDurationSeconds();
 
-        let currentTireIndex = 0;
-        while (countCurrentLaps() < targetLaps) {
-            let ceil = getCeiling(lastSplit.driver, newStint.tire);
-            if (newStint.laps < ceil) {
-                newStint.laps++;
+        while (safetyStretches-- > 0) {
+            let lastSplit = strategySplits[strategySplits.length - 1];
+            if (!lastSplit || lastSplit.stints.length === 0) break;
+
+            // 🚀 LOI N°2 : Le Détecteur d'Objectif (On évalue si on doit s'arrêter)
+            if (goal === 'time') {
+                let currentTotalSec = 0;
+                lastSplit.stints.forEach((s, idx) => {
+                    let lapTime = getDriverLapSeconds(lastSplit.driver, s.tire, s.fuelStrat);
+                    let pitTime = (idx === 0) ? 0 : 41000; // Estimation 35s Pit + 6s Pneus
+                    currentTotalSec += (s.laps * lapTime) + pitTime;
+                });
+                if (currentTotalSec >= totalSecRace) break; // Ligne d'arrivée franchie, l'Usine s'éteint
             } else {
-                currentTireIndex++;
-                if (currentTireIndex < tires.length) {
-                    newStint.tire = tires[currentTireIndex]; // Mue vers Medium, Dur...
+                if (countCurrentLaps() >= targetLaps) break; // Objectif de tours atteint, l'Usine s'éteint
+            }
+
+            // 🚀 LOI N°3 : L'Intervention sous contraintes (Bouclier A - Fenêtres)
+            if (hasPitWindow) {
+                let isLapMode = document.getElementById('pit-window-mode-tours')?.checked;
+                let isOutOfWindow = false;
+                let currentTotalLaps = lastSplit.stints.reduce((sum, s) => sum + s.laps, 0);
+
+                let currentTotalSec = 0;
+                lastSplit.stints.forEach((s, idx) => {
+                    let lapTime = getDriverLapSeconds(lastSplit.driver, s.tire, s.fuelStrat);
+                    let pitTime = (idx === 0) ? 0 : 41000;
+                    currentTotalSec += (s.laps * lapTime) + pitTime;
+                });
+
+                if (isLapMode) {
+                    let winO = parseInt(document.getElementById('lap-pit-window-open')?.value) || 0;
+                    let winC = parseInt(document.getElementById('lap-pit-window-close')?.value) || 0;
+                    if ((winO > 0 || winC > 0) && (currentTotalLaps < winO || currentTotalLaps > winC)) {
+                        isOutOfWindow = true;
+                    }
                 } else {
-                    break; // Mur absolu atteint, on ajoute un autre relais
+                    let winO_str = document.getElementById('time-pit-window-open')?.value || "";
+                    let winC_str = document.getElementById('time-pit-window-close')?.value || "";
+                    if (winO_str !== "" && winC_str !== "") {
+                        let secO = timeStringToSeconds(winO_str);
+                        let secC = timeStringToSeconds(winC_str);
+                        if (currentTotalSec < secO || currentTotalSec > secC) isOutOfWindow = true;
+                    }
+                }
+
+                if (isOutOfWindow) break; // Arrêt immédiat : impossible de résoudre légalement
+            }
+
+            // 🚀 Bouclier B : Quotas et Pneus Secs Strictement
+            let dryTires = ['T', 'M', 'D'].filter(t => tires.includes(t));
+            if (dryTires.length === 0) break; // Sécurité extrême anti-crash
+
+            const countTireUsage = (tireToCheck) => {
+                let count = 0;
+                strategySplits.forEach((split, i) => {
+                    split.stints.forEach((stint, j) => {
+                        let isAbsFirst = (i === 0 && j === 0) || ((isOnline || isSolo) && j === 0);
+                        if ((stint.changeTires || isAbsFirst) && stint.tire === tireToCheck) count++;
+                    });
+                });
+                return count;
+            };
+
+            let selectedTire = null;
+            for (let testTire of dryTires) {
+                let maxQuota = parseInt(document.getElementById(`val-${testTire}-3`)?.value) || 999;
+                let hasMax = document.getElementById(`cb-${testTire}-3`)?.checked;
+                let currentUsage = countTireUsage(testTire);
+
+                if (!hasMax || (currentUsage + 1 <= maxQuota)) {
+                    selectedTire = testTire;
+                    break; // Voie libre pour ce pneu !
+                }
+            }
+
+            if (!selectedTire) selectedTire = dryTires[dryTires.length - 1]; // Survie absolue
+
+            let newStint = {
+                tire: selectedTire, fuelStrat: 'push', laps: 1, changeTires: true,
+                isPitted: false, lockedTimeSec: null, manualFuel: null
+            };
+            lastSplit.stints.push(newStint);
+
+            let currentDryIndex = dryTires.indexOf(selectedTire);
+            let objectiveMet = false;
+
+            while (!objectiveMet) {
+                if (goal === 'time') {
+                    let currentTotalSec = 0;
+                    lastSplit.stints.forEach((s, idx) => {
+                        let lapTime = getDriverLapSeconds(lastSplit.driver, s.tire, s.fuelStrat);
+                        let pitTime = (idx === 0) ? 0 : 41000;
+                        currentTotalSec += (s.laps * lapTime) + pitTime;
+                    });
+                    if (currentTotalSec >= totalSecRace) objectiveMet = true;
+                } else {
+                    if (countCurrentLaps() >= targetLaps) objectiveMet = true;
+                }
+
+                if (objectiveMet) break;
+
+                let ceil = getCeiling(lastSplit.driver, newStint.tire);
+                if (newStint.laps < ceil) {
+                    newStint.laps++;
+                } else {
+                    // MUE : Le pneu est plein. On essaie de muter, TOUJOURS avec Bouclier B
+                    let mutated = false;
+                    while (currentDryIndex + 1 < dryTires.length) {
+                        currentDryIndex++;
+                        let mutTire = dryTires[currentDryIndex];
+                        let maxQuota = parseInt(document.getElementById(`val-${mutTire}-3`)?.value) || 999;
+                        let hasMax = document.getElementById(`cb-${mutTire}-3`)?.checked;
+                        let currentUsage = countTireUsage(mutTire);
+
+                        if (!hasMax || (currentUsage + 1 <= maxQuota)) {
+                            newStint.tire = mutTire; // Mutation autorisée !
+                            mutated = true;
+                            break;
+                        }
+                    }
+                    if (!mutated) break; // Impossible de muter légalement, on force l'arrêt aux stands
                 }
             }
         }

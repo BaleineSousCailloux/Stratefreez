@@ -169,8 +169,8 @@ body {
 /* Le bouton Flash : Jumeau parfait du cadenas (38x38px) */
 #btn-flash-msg {
     border-radius: 4px;
-    width: 38px;
-    height: 38px;
+    width: 35px;
+    height: 35px;
     padding: 8px;
     display: flex;
     justify-content: center;
@@ -207,8 +207,8 @@ body {
 }
 
 .save-badge {
-    width: 38px;
-    height: 38px;
+    width: 35px;
+    height: 35px;
     border-radius: 4px;
     transition: all 0.3s;
     display: flex;
@@ -2212,7 +2212,7 @@ select:disabled, input:disabled, .locked-sim {
 }
 
 .icon-navbar {
-    font-size: 24px !important;
+    font-size: 18px !important;
 }
 
 .icon-sm {
@@ -2789,7 +2789,7 @@ svg.live-grey-icon {
    1. Si le petit côté est < 300px
    2. Si le grand côté est < 600px 
 */
-@media (max-width: 299px) and (orientation: portrait), (max-height: 199px) and (orientation: landscape), (max-height: 449px) and (orientation: portrait), (max-width: 599px) and (orientation: landscape) {
+@media (max-width: 324px) and (orientation: portrait), (max-height: 199px) and (orientation: landscape), (max-height: 449px) and (orientation: portrait), (max-width: 599px) and (orientation: landscape) {
 
     /* 🚀 MAGIE CSS : On masque absolument TOUS les enfants directs du body, SAUF l'écran de blocage */
     body > *:not(#device-too-small) {

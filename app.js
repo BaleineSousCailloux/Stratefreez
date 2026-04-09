@@ -964,6 +964,8 @@ async function confirmNewRace() {
 
     // 🚀 NAISSANCE LOCALE PURE : L'app génère ses IDs mais n'appelle pas Firebase
     currentRaceId = db.collection('races').doc().id;
+    // 🚀 FIX BANDEAU : On donne le ticket d'or au créateur de la course
+    sessionStorage.setItem('justCreatedRace_' + currentRaceId, 'true');
     currentRacePin = Math.floor(1000 + Math.random() * 9000).toString();
     isRaceActive = true;
     isFirstStrategyBuilt = false; // 🚀 VERROU CLOUD FERMÉ
@@ -1150,7 +1152,6 @@ function listenToCloudRace() {
 
             // 🚀 MISE À JOUR DU VERROU (Le Cerveau Unifié prendra la décision)
             cloudFlashLockUntil = data.flashLockUntil || 0;
-            if (typeof evaluateFlashButtonState === 'function') evaluateFlashButtonState();
 
             // 1. SÉCURITÉ DE SAISIE (Empêche le clavier de se fermer)
             let activeEl = document.activeElement;
@@ -1229,7 +1230,8 @@ function listenToCloudRace() {
                 isFlashMessageAlive = false;
                 document.getElementById('flash-alert-overlay')?.classList.add('hidden');
             }
-            evaluateFlashButtonState(); // Re-vérifie la bulle après réception
+            // 🚀 FIX 2 : On appelle le Cerveau Unifié MAINTENANT que le verrou ET le message sont mis à jour
+            if (typeof evaluateFlashButtonState === 'function') evaluateFlashButtonState();
             // 4. MISE À JOUR STRATÉGIE (Seulement si on ne tape pas)
             if (data.strategyData && !isTyping) {
                 strategySplits = data.strategyData;
@@ -4210,20 +4212,29 @@ function renderStrategy() {
 
     if (wasFirstBuild) {
         triggerCloudSync(); // 🚀 Envoie instantanément la coquille parfaite au Cloud !
-        // 🚀 NOTIFICATION VISUELLE (Utilise le bandeau existant)
-        let banner = document.getElementById('end-race-banner');
-        let raceName = document.getElementById('race-name-input')?.value || "La course";
-        if (banner) {
-            let oldText = banner.innerText;
-            let oldBg = banner.style.background;
-            banner.innerText = `✅ ${raceName} générée et partagée sur le Cloud !`;
-            banner.style.background = "#2196F3";
-            banner.classList.remove('hidden');
-            setTimeout(() => {
-                banner.classList.add('hidden');
-                banner.style.background = oldBg;
-                banner.innerText = oldText;
-            }, 4000);
+
+        // 🚀 NOTIFICATION VISUELLE SÉCURISÉE (Uniquement pour le vrai créateur)
+        let isCreator = sessionStorage.getItem('justCreatedRace_' + currentRaceId);
+
+        if (isCreator === 'true') {
+            sessionStorage.removeItem('justCreatedRace_' + currentRaceId); // 🚀 On déchire le ticket (anti-F5)
+
+            let banner = document.getElementById('end-race-banner');
+            let inputVal = document.getElementById('race-name-input')?.value?.trim();
+            // Utilisation des backticks (Alt Gr + 7 sur un clavier Windows)
+            let raceName = inputVal ? `Course "${inputVal}"` : "Course";
+            if (banner) {
+                let oldText = banner.innerText;
+                let oldBg = banner.style.background;
+                banner.innerText = `✅ ${raceName} générée et partagée`;
+                banner.style.background = "#2196F3";
+                banner.classList.remove('hidden');
+                setTimeout(() => {
+                    banner.classList.add('hidden');
+                    banner.style.background = oldBg;
+                    banner.innerText = oldText;
+                }, 4000);
+            }
         }
     }
 
@@ -5436,9 +5447,10 @@ function sendFlashMessage() {
 
     if (!msg || !currentRaceId || !isEngineerMode) return;
 
-    closeFlashInput(); // Ferme la modale et prépare le terrain
+    // 🚀 FIX 1 : On ferme la modale visuellement SANS envoyer de verrou '0' au Cloud
+    document.getElementById('flash-input-modal').classList.add('hidden');
 
-    // 🚀 VERROU B2 & ENVOI CIBLÉ : Écrit UNIQUEMENT dans la course en cours + Relance 45s
+    // VERROU B2 & ENVOI CIBLÉ : Écrit UNIQUEMENT dans la course en cours + Relance 45s
     let lockExpiry = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0) + 45000;
 
     db.collection('races').doc(currentRaceId).set({

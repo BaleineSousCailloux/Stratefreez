@@ -19,6 +19,7 @@ let lastCalculatedState = null;
 let liveStandbyTimeout = null;
 let isFirstStrategyBuilt = false;
 let isFlashMessageAlive = false; // Permet au chrono de savoir si un message bloque la zone
+let cloudFlashLockUntil = 0; // Mémoire du verrou Cloud
 
 // ==========================================
 // --- NOUVEAU : HORLOGE ATOMIQUE (0 Quota) ---
@@ -1147,28 +1148,9 @@ function listenToCloudRace() {
         if (doc.exists) {
             const data = doc.data();
 
-            // 🚀 GESTION DU VERROU CLOUD POUR LE BOUTON FLASH
-            let flashBtn = document.getElementById('btn-flash-msg');
-            if (flashBtn) {
-                let now = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0);
-
-                if (data.flashLockUntil && data.flashLockUntil > now) {
-                    // Le verrou est actif : on cache le bouton
-                    flashBtn.classList.add('hidden');
-
-                    // Sécurité locale : on le réaffichera automatiquement quand le temps sera écoulé
-                    // (au cas où il n'y a pas d'autre mise à jour Firebase entre temps)
-                    setTimeout(() => {
-                        let freshNow = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0);
-                        if ((!data.flashLockUntil || data.flashLockUntil <= freshNow) && isEngineerMode) {
-                            flashBtn.classList.remove('hidden');
-                        }
-                    }, data.flashLockUntil - now);
-                } else {
-                    // Le verrou est levé : on affiche le bouton (uniquement pour les ingénieurs)
-                    if (isEngineerMode) flashBtn.classList.remove('hidden');
-                }
-            }
+            // 🚀 MISE À JOUR DU VERROU (Le Cerveau Unifié prendra la décision)
+            cloudFlashLockUntil = data.flashLockUntil || 0;
+            if (typeof evaluateFlashButtonState === 'function') evaluateFlashButtonState();
 
             // 1. SÉCURITÉ DE SAISIE (Empêche le clavier de se fermer)
             let activeEl = document.activeElement;
@@ -5476,50 +5458,34 @@ function dismissFlashLocal() {
 
 // 🚀 LE RADAR DE SILENCE RADIO (Évalue si la bulle a le droit de s'afficher)
 function evaluateFlashButtonState() {
-    let btn = document.getElementById('btn-flash-msg');
-    if (!btn) return;
+    let flashBtn = document.getElementById('btn-flash-msg');
+    if (!flashBtn) return;
 
-    // 1. Spectateur OU Message déjà en cours = Invisible
-    if (!isEngineerMode || isFlashMessageAlive) {
-        btn.classList.add('hidden');
+    // Règle 1 : Seuls les ingénieurs ont le droit de voir le bouton
+    if (typeof isEngineerMode === 'undefined' || !isEngineerMode) {
+        flashBtn.classList.add('hidden');
         return;
     }
 
-    // 2. Zone de Silence (1m30) si le chrono tourne
-    let str = localStorage.getItem('stratefreez-timer');
-    if (str && liveTimerActive) {
-        let timerState = JSON.parse(str);
-        if (timerState && timerState.active) {
-            let elapsed = getUnifiedTime() - timerState.startTimeReal;
-            let raceRem = timerState.targetSec - elapsed;
+    // Calcul de l'heure exacte synchronisée avec le serveur
+    let now = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0);
+    let isLocked = cloudFlashLockUntil > now;
 
-            // Trouver le relais actif pour le temps avant le pit
-            let timeToPit = Infinity;
-            for (let i = 0; i < strategySplits.length; i++) {
-                if (timerState.type === 'online' && i !== timerState.splitIdx) continue;
-                for (let j = 0; j < strategySplits[i].stints.length; j++) {
-                    let stint = strategySplits[i].stints[j];
-                    if (!stint.isPitted) {
-                        timeToPit = stint.endSec - elapsed;
-                        break;
-                    }
-                }
-                if (timeToPit !== Infinity) break;
-            }
+    // Règle 2 : Le bouton disparait SI un message est à l'écran OU SI le verrou est actif (modale ouverte)
+    if (isFlashMessageAlive || isLocked) {
+        flashBtn.classList.add('hidden');
 
-            // 🚀 90000 ms = 1 minute 30 secondes
-            let isNearEnd = (raceRem >= 0 && raceRem <= 90000);
-            let isNearPit = (timeToPit >= 0 && timeToPit <= 90000);
-
-            if (isNearEnd || isNearPit) {
-                btn.classList.add('hidden');
-                return; // ⛔ Silence Radio imposé !
-            }
+        // Filet de sécurité : Si seul le verrou bloque, on programme le retour automatique du bouton à l'expiration (les fameuses 45s de sécurité)
+        if (isLocked && !isFlashMessageAlive) {
+            clearTimeout(window.flashLockTimeout);
+            window.flashLockTimeout = setTimeout(() => {
+                evaluateFlashButtonState(); // On se ré-évalue à la fin du chrono
+            }, cloudFlashLockUntil - now + 100); // (+100ms de marge de sécurité)
         }
+    } else {
+        // Règle 3 : Pas de message ET pas de verrou = La voie est libre, on affiche le bouton !
+        flashBtn.classList.remove('hidden');
     }
-
-    // Si tout est OK, la bulle est visible pour l'Ingénieur
-    btn.classList.remove('hidden');
 }
 
 // ==========================================

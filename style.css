@@ -2196,7 +2196,7 @@ select:disabled, input:disabled, .locked-sim {
     margin-right: 10px;
 }
 
-.icon-navbar {
+.icon-navbar, #save-lock-icon {
     font-size: 18px !important;
 }
 

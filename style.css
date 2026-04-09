@@ -166,21 +166,6 @@ body {
     min-height: 40px !important;
 }
 
-/* Le bouton Flash : Jumeau parfait du cadenas (38x38px) */
-#btn-flash-msg {
-    border-radius: 4px;
-    width: 35px;
-    height: 35px;
-    padding: 8px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    border: 1px solid transparent;
-    box-sizing: border-box;
-}
-
 /* Couleurs d'urgence pour l'interface */
 .bg-white {
     background-color: #fff !important;
@@ -193,8 +178,8 @@ body {
 /* Le bouton Flash : Jumeau parfait du cadenas (38x38px) */
 #btn-flash-msg {
     border-radius: 4px;
-    width: 38px;
-    height: 38px;
+    width: 35px;
+    height: 35px;
     display: flex;
     justify-content: center;
     align-items: center;

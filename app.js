@@ -564,7 +564,7 @@ function loadConfig(event) {
                             if (timerState.type === 'online' && i !== timerState.splitIdx) continue;
                             for (let j = 0; j < strategySplits[i].stints.length; j++) {
                                 let stint = strategySplits[i].stints[j];
-                                if (!stint.isPitted && stint.endSec !== undefined && elapsed >= (stint.endSec + 300000)) {
+                                if (!stint.isPitted && stint.endSec !== undefined && elapsed >= (stint.endSec + 180000)) {
                                     stint.isPitted = true;
                                     stint.lockedTimeSec = stint.endSec;
                                     needsCatchup = true;
@@ -911,8 +911,8 @@ function showErrorModal(msg) {
 }
 
 function clearCurrentRaceData() {
-    // 🚀 ÉTAPE 0 : ON COUPE LE BOUCLIER INGÉNIEUR (Master Lock)
-    // Cela empêche toute sauvegarde Cloud accidentelle pendant le nettoyage.
+    // 🚀 ÉTAPE 0 : ON COUPE LA CONNEXION ET ON ACTIVE LE BOUCLIER INGÉNIEUR (Master Lock)
+    if (unsubscribeCloud) { unsubscribeCloud(); unsubscribeCloud = null; }
     isEngineerMode = false;
     toggleObserverMode(true);
     // 🚀 ÉTAPE 1 : ON DÉTRUIT LE CHRONO LOCAL EN SILENCE AVANT TOUT
@@ -924,9 +924,17 @@ function clearCurrentRaceData() {
     localStorage.removeItem('stratefreez-current-race-pin');
     localStorage.setItem('stratefreez-is-race-active', 'false');
 
+    // 🚀 AMNÉSIE CIBLÉE : On vide le brouillon de l'ancienne course
+    localStorage.removeItem('stratefreez-form-state');
+    localStorage.removeItem('stratefreez-data');
+
     document.getElementById('form-params').reset();
     document.getElementById('form-tech').reset();
     strategySplits = [];
+
+    // 🚀 AMNÉSIE GLOBALE : Réinitialisation des drapeaux
+    isFirstStrategyBuilt = false;
+    lastCalculatedState = null;
 
     // 🚀 ÉTAPE 0.5 : ON TUE LE MESSAGE FLASH LOCAL (Empêche le blocage du bouton en changeant de course)
     isFlashMessageAlive = false;
@@ -945,13 +953,15 @@ function clearCurrentRaceData() {
     document.getElementById('num-drivers').value = 1;
     document.getElementById('num-spotters').value = 1;
     document.getElementById('total-splits').value = 1;
+
+    // 🚀 NETTOYAGE VISUEL : Force la destruction des blocs Pilote 2, 3...
+    updateDynamicFields();
     // 🚀 AXE 2 : On s'assure de vider le champ de duplication dans l'onglet Data
     let duplicateInput = document.getElementById('save-config-name');
     if (duplicateInput) duplicateInput.value = '';
     updatePinDisplay();
     updateSnapshotDropdown();
-    // 🚀 AJOUT ICI : On coupe l'écoute du cloud si on vide la course
-    if (unsubscribeCloud) { unsubscribeCloud(); unsubscribeCloud = null; }
+    
     // 🚀 SÉCURITÉ : Aucun nom de course = Mode Viewer par défaut
     isEngineerMode = false;
     toggleObserverMode(true);
@@ -1989,8 +1999,8 @@ function timerTick() {
         if (isOvertime) navTitle.classList.add('text-danger');
     }
 
-    // 🚀 5 minutes de marge = 300 000 ms
-    if (elapsed >= targetSec + 300000) {
+    // 🚀 3 minutes de marge = 180 000 ms
+    if (elapsed >= targetSec + 180000) {
         if (timerState.type === 'online') {
             if (strategySplits[timerState.splitIdx]) strategySplits[timerState.splitIdx].isFinished = true;
         } else {
@@ -2020,7 +2030,7 @@ function timerTick() {
         if (tr) tr.classList.add('active-live-stint');
 
         // 🚀 Auto Pit (Buffer = 300 000 ms)
-        if (elapsed >= firstUnpitted.stint.endSec + 300000 && !isOvertime) {
+        if (elapsed >= firstUnpitted.stint.endSec + 180000 && !isOvertime) {
             strategySplits[firstUnpitted.i].stints[firstUnpitted.j].isPitted = true;
             strategySplits[firstUnpitted.i].stints[firstUnpitted.j].lockedTimeSec = firstUnpitted.stint.endSec;
             cascadeFixPitWindows();
@@ -5311,9 +5321,10 @@ function checkDeleteRaceInput() {
 
 function confirmDeleteRace() {
     closeDeleteRaceModal();
-    // 1. On supprime les snapshots locaux
+    // 1. On supprime les snapshots locaux et le PIn de la course
     if (currentRaceId) {
         localStorage.removeItem(`stratefreez-snapshots-${currentRaceId}`);
+        localStorage.removeItem(`stratefreez-passport-${currentRaceId}`);
         // 🚀 AXE 4 : Destruction physique dans Firebase
         db.collection('races').doc(currentRaceId).delete().catch(e => console.error("Erreur suppression DB", e));
     }

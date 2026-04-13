@@ -1005,7 +1005,7 @@ async function confirmNewRace() {
     if (typeof purgeLocalState === 'function') purgeLocalState();
 
     // 🚀 NAISSANCE LOCALE PURE : L'app génère ses IDs mais n'appelle pas Firebase
-    currentRaceId = db.collection('races').doc().id;
+    currentRaceId = 'race_' + Date.now();
     // 🚀 FIX BANDEAU : On donne le ticket d'or au créateur de la course
     sessionStorage.setItem('justCreatedRace_' + currentRaceId, 'true');
     currentRacePin = Math.floor(1000 + Math.random() * 9000).toString();

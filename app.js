@@ -1641,11 +1641,15 @@ function getRaceDurationSeconds() {
         }
     }
 
-    // Au cas où l'ancien champ unique existe encore
+    // Au cas où l'ancien champ unique existe encore (Lecture Blindée)
     let val = document.getElementById('race-duration')?.value?.replace(/\D/g, '') || "";
-    if (val.length === 4) return (parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60) * 1000; // 🚀 MS
-    if (val.length === 3) return (parseInt(val.substring(0, 1)) * 3600 + parseInt(val.substring(1, 3)) * 60) * 1000; // 🚀 MS
-    if (val.length <= 2 && val.length > 0) return parseInt(val) * 3600000; // 🚀 MS (3600 * 1000)
+    if (val.length >= 3) {
+        let m = parseInt(val.slice(-2)) || 0;
+        let h = parseInt(val.slice(0, -2)) || 0;
+        return (h * 3600 + m * 60) * 1000; // 🚀 MS
+    } else if (val.length > 0) {
+        return parseInt(val) * 3600000; // 🚀 MS (3600 * 1000)
+    }
     return 0;
 }
 
@@ -2024,7 +2028,7 @@ function timerTick() {
     // 🚀 L'horloge tourne en MILLISECONDES pures !
     let elapsed = getUnifiedTime() - timerState.startTimeReal;
     let targetSec = timerState.targetSec; // 🚀 Déjà en ms
-    let isOvertime = elapsed >= (targetSec - 10); // 🚀 La fameuse Micro-tolérance
+    let isOvertime = Math.round(elapsed / 1000) >= Math.round(targetSec / 1000); // 🚀 Le Juge Arrondi
 
     let navTitle = document.getElementById('nav-brand-text');
     if (navTitle) {
@@ -2728,13 +2732,27 @@ function getDriverLapSeconds(driverName, tire, strat) {
     if (!timeStr) timeStr = document.getElementById(`global-time-${strat}-${tire}`)?.value;
     if (!timeStr) return 60000;
 
-    let parts = timeStr.split(':');
-    if (parts.length === 2) {
-        return (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000; // 🚀 MS
-    } else if (parts.length === 3) {
-        return (parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])) * 1000; // 🚀 MS
+    // 1. LECTURE CLASSIQUE (Si les deux-points sont présents)
+    if (timeStr.includes(':')) {
+        let parts = timeStr.split(':');
+        if (parts.length === 2) {
+            return (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000; // 🚀 MS
+        } else if (parts.length === 3) {
+            return (parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])) * 1000; // 🚀 MS
+        }
     }
-    return 60000; // 🚀 MS
+
+    // 2. LECTURE BLINDÉE (En cours de frappe, aucun deux-points)
+    let val = timeStr.replace(/\D/g, ''); // On garde uniquement les chiffres purs
+    if (val.length >= 4) {
+        // Lecture de droite à gauche (ex: 0132000 -> 000ms, 32s, 01m)
+        let ms = parseInt(val.slice(-3)) || 0;
+        let s = parseInt(val.slice(-5, -3)) || 0;
+        let m = parseInt(val.slice(0, -5)) || 0;
+        return (m * 60 + s) * 1000 + ms; // 🚀 MS
+    }
+
+    return 60000; // 🚀 MS (Sécurité absolue finale)
 }
 
 function getDriverTireLife(driverName, tire) {
@@ -2750,16 +2768,35 @@ function getDriverTireLife(driverName, tire) {
 
 function timeStringToSeconds(str) {
     if (!str) return 0;
+
+    // 1. LECTURE CLASSIQUE (100% identique à votre code initial)
     if (str.includes(':')) {
         let p = str.split(':');
         if (p.length === 3) return (parseInt(p[0] || 0) * 3600 + parseInt(p[1] || 0) * 60 + parseInt(p[2] || 0)) * 1000; // 🚀 MS
         if (p.length === 2) return (parseInt(p[0] || 0) * 3600 + parseInt(p[1] || 0) * 60) * 1000; // 🚀 MS
-    } else {
-        let val = str.replace(/\D/g, '');
-        if (val.length === 6) return (parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60 + parseInt(val.substring(4, 6))) * 1000; // 🚀 MS
-        if (val.length === 4) return (parseInt(val.substring(0, 2)) * 3600 + parseInt(val.substring(2, 4)) * 60) * 1000; // 🚀 MS
-        if (val.length <= 2 && val.length > 0) return parseInt(val) * 3600000; // 🚀 MS
     }
+
+    // 2. LECTURE BLINDÉE (Le filet de sécurité)
+    let val = str.replace(/\D/g, '');
+
+    // Format 6 chiffres (ex: 023000 -> 2h 30m 00s)
+    if (val.length === 6) {
+        let s = parseInt(val.slice(-2)) || 0;
+        let m = parseInt(val.slice(-4, -2)) || 0;
+        let h = parseInt(val.slice(0, -4)) || 0; // 🚀 CORRECTION ICI : -4 pour isoler les heures
+        return (h * 3600 + m * 60 + s) * 1000; // 🚀 MS
+    }
+
+    // Format standard HHMM (ex: 1530 -> 15h 30m)
+    if (val.length >= 3) {
+        let m = parseInt(val.slice(-2)) || 0;
+        let h = parseInt(val.slice(0, -2)) || 0;
+        return (h * 3600 + m * 60) * 1000; // 🚀 MS
+    } else if (val.length > 0) {
+        // Si 1 ou 2 chiffres (ex: "2" -> 2 Heures)
+        return parseInt(val) * 3600000; // 🚀 MS
+    }
+
     return 0;
 }
 
@@ -3865,9 +3902,12 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                     let relativeSec = currentSec - split.stints[0].startSec;
                     let relativeLap = currentLap - split.stints[0].startLap;
                     if ((isLastSplit || isOnline) && goal === 'time') {
-                        // 🚀 MICRO-TOLÉRANCE (- 10 ms)
-                        if (relativeSec < (totalSecRace / splitsCount) - 10) action = 'add';
-                        else if (relativeSec - lsTime >= (totalSecRace / splitsCount) - 10) action = 'remove';
+                        // 🚀 LE JUGE ARRONDI : On compare des secondes entières
+                        let rSec = Math.round(relativeSec / 1000);
+                        let tSec = Math.round((totalSecRace / splitsCount) / 1000);
+                        let lsSec = Math.round(lsTime / 1000);
+                        if (rSec < tSec) action = 'add';
+                        else if (rSec - lsSec >= tSec) action = 'remove';
                     } else if ((isLastSplit || isOnline) && goal === 'laps') {
                         if (relativeLap < targetPerRelayLaps) action = 'add';
                         else if (relativeLap - 1 >= targetPerRelayLaps) action = 'remove';
@@ -3880,14 +3920,17 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                             if (relativeSec > secC) action = 'remove';
                         }
                     } else if (isHardCascade) {
-                        if (goal === 'time' && relativeSec < (totalSecRace / splitsCount) - 10) action = 'add';
+                        if (goal === 'time' && Math.round(relativeSec / 1000) < Math.round((totalSecRace / splitsCount) / 1000)) action = 'add';
                         else if (goal === 'laps' && relativeLap < targetPerRelayLaps) action = 'add';
                     }
                 } else {
                     if (isLastSplit && goal === 'time') {
-                        // 🚀 MICRO-TOLÉRANCE (- 10 ms)
-                        if (currentSec < totalSecRace - 10) action = 'add';
-                        else if (currentSec - lsTime >= totalSecRace - 10) action = 'remove';
+                        // 🚀 LE JUGE ARRONDI
+                        let cSec = Math.round(currentSec / 1000);
+                        let tSec = Math.round(totalSecRace / 1000);
+                        let lsSec = Math.round(lsTime / 1000);
+                        if (cSec < tSec) action = 'add';
+                        else if (cSec - lsSec >= tSec) action = 'remove';
                     } else if (isLastSplit && goal === 'laps') {
                         if (currentLap < targetLapsRace) action = 'add';
                         else if (currentLap - 1 >= targetLapsRace) action = 'remove';
@@ -4007,8 +4050,11 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             if (isOnline || isSolo) {
                 let relativeSec = fSec - split.stints[0].startSec;
                 let relativeLap = fLap - split.stints[0].startLap;
+                let rSecRound = Math.round(relativeSec / 1000);
+                let tSecRound = Math.round((totalSecRace / splitsCount) / 1000);
+
                 if ((isLastSplit || isOnline) && goal === 'time') {
-                    if (relativeSec < (totalSecRace / splitsCount) - 10) missingSec = (totalSecRace / splitsCount) - relativeSec; // 🚀 Micro-tolérance
+                    if (rSecRound < tSecRound) missingSec = (totalSecRace / splitsCount) - relativeSec;
                 } else if ((isLastSplit || isOnline) && goal === 'laps') {
                     if (relativeLap < targetPerRelayLaps) missingLaps = targetPerRelayLaps - relativeLap;
                 } else if (hasPitWindow) {
@@ -4018,12 +4064,12 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                         if (relativeSec + lsTime <= secC) missingSec = secC - relativeSec;
                     }
                 } else if (isHardCascade) {
-                    if (goal === 'time' && relativeSec < (totalSecRace / splitsCount) - 10) missingSec = (totalSecRace / splitsCount) - relativeSec;
+                    if (goal === 'time' && rSecRound < tSecRound) missingSec = (totalSecRace / splitsCount) - relativeSec;
                     else if (goal === 'laps' && relativeLap < targetPerRelayLaps) missingLaps = targetPerRelayLaps - relativeLap;
                 }
             } else {
                 if (isLastSplit && goal === 'time') {
-                    if (fSec < totalSecRace - 10) missingSec = totalSecRace - fSec; // 🚀 Micro-tolérance
+                    if (Math.round(fSec / 1000) < Math.round(totalSecRace / 1000)) missingSec = totalSecRace - fSec;
                 } else if (isLastSplit && goal === 'laps') {
                     if (fLap < targetLapsRace) missingLaps = targetLapsRace - fLap;
                 } else if (isStartTarget) {
@@ -4082,8 +4128,8 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
         if (!isOnline && !isSolo) {
             if (isLastSplit) {
-                // 🚀 MICRO-TOLÉRANCE DANS LE MUR DE FIN DE COURSE
-                if (goal === 'time' && finalSec < totalSecRace - 10) {
+                // 🚀 LE JUGE ARRONDI
+                if (goal === 'time' && Math.round(finalSec / 1000) < Math.round(totalSecRace / 1000)) {
                     split.targetFailed = true; haltMsg = `Capacité insuffisante pour atteindre la fin de course (Relais ${i + 1}).`;
                 } else if (goal === 'laps' && finalLap < targetLapsRace) {
                     split.targetFailed = true; haltMsg = `Capacité insuffisante pour atteindre le tour cible (Relais ${i + 1}).`;
@@ -4153,7 +4199,7 @@ function checkGlobalRules() {
 
         if (isOnline || isSolo) {
             if (goal === 'time') {
-                if (splitEndSec < splitDurSec - 10) isGlobalObjectiveMet = false;
+                if (Math.round(splitEndSec / 1000) < Math.round(splitDurSec / 1000)) isGlobalObjectiveMet = false;
             } else {
                 let targetPerRelay = Math.floor(targetLapsRace / splitsCount);
                 if (isLastSplit) targetPerRelay = targetLapsRace - (i * targetPerRelay);
@@ -4162,7 +4208,7 @@ function checkGlobalRules() {
         } else {
             if (isLastSplit) {
                 if (goal === 'time') {
-                    if (splitEndSec < totalSecRace - 10) isGlobalObjectiveMet = false;
+                    if (Math.round(splitEndSec / 1000) < Math.round(totalSecRace / 1000)) isGlobalObjectiveMet = false;
                 } else {
                     if (split.stints[split.stints.length - 1].endLap < targetLapsRace) isGlobalObjectiveMet = false;
                 }
@@ -4681,7 +4727,7 @@ function renderStrategy() {
         if (isOnline || isSolo) {
             if (goal === 'time') {
                 let targetSec = totalSecRace / splitsCount;
-                let isMet = splitEndSec >= targetSec - 10; // 🚀 MICRO-TOLERANCE
+                let isMet = Math.round(splitEndSec / 1000) >= Math.round(targetSec / 1000); // 🚀 LE JUGE ARRONDI
                 if (!isMet) isGlobalObjectiveMet = false;
                 let colClass = isMet ? 'text-success' : 'text-danger';
                 let msg = isMet ? `🏁 Objectif atteint : ${splitLaps} tours en ${formatTime(splitEndSec)}` : `⚠️ Objectif non atteint (Cible: ${formatTime(targetSec)})`;
@@ -4699,7 +4745,7 @@ function renderStrategy() {
         } else {
             if (isLastSplit) {
                 if (goal === 'time') {
-                    let isMet = splitEndSec >= totalSecRace - 10; // 🚀 MICRO-TOLERANCE
+                    let isMet = Math.round(splitEndSec / 1000) >= Math.round(totalSecRace / 1000); // 🚀 LE JUGE ARRONDI
                     if (!isMet) isGlobalObjectiveMet = false;
                     let colClass = isMet ? 'text-success' : 'text-danger';
                     let msg = `🏁 Fin de course : ${formatTime(splitEndSec)} (Cible: ${formatTime(totalSecRace)})`;

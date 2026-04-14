@@ -172,6 +172,10 @@ function saveFormState() {
 
 document.addEventListener('input', (e) => {
     checkRequiredFields();
+    // 🚀 L'INTERFACE ESSENCE EN DIRECT
+    if (e.target.id === 'fuel-start') {
+        if (typeof toggleFuelUI === 'function') toggleFuelUI();
+    }
     // 1. On garde uniquement les calculs visuels en direct.
     // 🚀 AUCUNE sauvegarde Cloud ne part pendant qu'on tape !
     if (['stop-timer-input', 'save-config-name', 'import-config-file', 'quick-save-name'].includes(e.target.id)) return;
@@ -682,6 +686,7 @@ function applyFormStateToDOM(state) {
             inp.value = `${m}:${s}.${ms}`;
         }
     });
+    if (typeof toggleFuelUI === 'function') toggleFuelUI();
 }
 
 // ==========================================
@@ -953,6 +958,12 @@ function clearCurrentRaceData() {
     document.getElementById('num-drivers').value = 1;
     document.getElementById('num-spotters').value = 1;
     document.getElementById('total-splits').value = 1;
+    // 🚀 VALEURS PAR DÉFAUT (Carburant)
+    let fuelStartInp = document.getElementById('fuel-start');
+    if (fuelStartInp) fuelStartInp.value = "100 L";
+    let fuelSpeedInp = document.getElementById('fuel-speed');
+    if (fuelSpeedInp) fuelSpeedInp.value = "3 L/s";
+    if (typeof toggleFuelUI === 'function') toggleFuelUI();
 
     // 🚀 NETTOYAGE VISUEL : Force la destruction des blocs Pilote 2, 3...
     updateDynamicFields();
@@ -1801,7 +1812,34 @@ function syncTiresVisibility() {
     });
     if (document.getElementById('no-tire-warning')) document.getElementById('no-tire-warning').classList.toggle('hidden', anyChecked);
 }
+// 🚀 NOUVELLE FONCTION : Gestion de l'interface Carburant
+function toggleFuelUI() {
+    let fuelStartStr = document.getElementById('fuel-start')?.value.replace(/[^\d.]/g, '');
+    let initialFuel = fuelStartStr ? parseFloat(fuelStartStr) : 0;
+    let isFuelEnabled = (initialFuel > 0);
 
+    let speed = document.getElementById('fuel-speed');
+    let reserve = document.getElementById('fuel-reserve');
+    let consPush = document.getElementById('cons-push');
+    let consEco = document.getElementById('cons-eco');
+    let drvInputs = Array.from(document.querySelectorAll('.sync-driver-fuel'));
+
+    let targets = [speed, reserve, consPush, consEco, ...drvInputs].filter(el => el !== null);
+
+    targets.forEach(inp => {
+        if (!isFuelEnabled) {
+            if (!inp.dataset.originalPlaceholder) inp.dataset.originalPlaceholder = inp.placeholder;
+            inp.value = '';
+            inp.placeholder = "Sans conso";
+            inp.disabled = true;
+            inp.style.opacity = "0.5";
+        } else {
+            inp.disabled = false;
+            inp.style.opacity = "1";
+            if (inp.dataset.originalPlaceholder) inp.placeholder = inp.dataset.originalPlaceholder;
+        }
+    });
+}
 function applyFormatters() {
     document.querySelectorAll('.format-hhmm:not([data-formatted])').forEach(input => {
         input.addEventListener('blur', function () {
@@ -2519,6 +2557,14 @@ function toggleStintFuelStrat(i, j) {
     if (!isEngineerMode) return; // 🚀 BOUCLIER SPECTATEUR
     if (strategySplits[i] && strategySplits[i].stints[j]) {
         let stint = strategySplits[i].stints[j];
+        // 🚀 INTERCEPTION ECO LIVE
+        if (stint.fuelStrat === 'push') {
+            let driver = strategySplits[i].driver;
+            if (!hasEcoData(driver, stint.tire)) {
+                showErrorModal(`Veuillez revoir les paramètres éco pour les pneus ${stint.tire}.`);
+                return; // ⛔ Bloque le clic
+            }
+        }
         stint.fuelStrat = (stint.fuelStrat === 'push') ? 'eco' : 'push';
         cascadeFixPitWindows();
         saveFormState();
@@ -2640,15 +2686,24 @@ function getAvailableTires() {
     return t;
 }
 // 🚀 DÉTECTEUR STRICT : L'utilisateur a-t-il renseigné le mode Éco ?
-function hasEcoData(driverName) {
+function hasEcoData(driverName, tire) {
+    if (!tire) return false;
     let drvIndex = getAvailableDrivers().indexOf(driverName) + 1;
     let drivers = parseInt(document.getElementById('num-drivers').value) || 1;
     let isCustom = drivers > 1 && document.getElementById('personalize-drivers-toggle')?.checked;
 
+    let fuel = null;
+    let time = null;
+
     if (isCustom) {
-        return !!document.getElementById(`drv-${drvIndex}-fuel-eco`)?.value;
+        fuel = document.getElementById(`drv-${drvIndex}-fuel-eco`)?.value;
+        time = document.getElementById(`drv-${drvIndex}-time-eco-${tire}`)?.value;
     }
-    return !!document.getElementById('cons-eco')?.value;
+
+    if (!fuel) fuel = document.getElementById('cons-eco')?.value;
+    if (!time) time = document.getElementById(`global-time-eco-${tire}`)?.value;
+
+    return !!(fuel && time);
 }
 function getDriverFuelRate(driverName, strat) {
     if (!strat) strat = 'push';
@@ -3097,6 +3152,16 @@ function updateStintData(splitIdx, stintIdx, field, val) {
     let oldTarget = strategySplits[splitIdx].windowTarget;
 
     if (field === 'changeTires') val = (val === true);
+    // 🚀 INTERCEPTION ECO : Vérification stricte des données
+    if (field === 'fuelStrat' && val === 'eco') {
+        let tire = strategySplits[splitIdx].stints[stintIdx].tire;
+        let driver = strategySplits[splitIdx].driver;
+        if (!hasEcoData(driver, tire)) {
+            showErrorModal(`Revoir les paramètres éco pour les pneus ${tire}.`);
+            renderStrategy(); // Force la case à revenir sur Attack
+            return; // ⛔ Bloque la modification
+        }
+    }
 
     // 🚀 INTERCEPTION PNEUS : On interdit de décocher si on dépasse la gomme
     if (field === 'changeTires' && val === false && stintIdx > 0) {
@@ -3736,7 +3801,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
 
             // Si currentCap est Infinity, on n'entre jamais ici. Parfait !
             if (stint.laps > currentCap) {
-                let canUseEco = hasEcoData(strategySplits[i].driver);
+                let canUseEco = hasEcoData(strategySplits[i].driver, stint.tire);
                 let pushCap = getStintCapacity(i, j, 'push');
                 let ecoCap = canUseEco ? getStintCapacity(i, j, 'eco') : 0;
 
@@ -3885,7 +3950,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
                                     if (!isLapMode && secC > 0 && futureEndSec > secC) continue;
                                 }
                                 if (stint.fuelStrat !== 'eco') {
-                                    let canUseEco = hasEcoData(strategySplits[s].driver);
+                                    let canUseEco = hasEcoData(strategySplits[s].driver, stint.tire);
                                     if (canUseEco) {
                                         let pushCap = getStintCapacity(s, st, 'push');
                                         let ecoCap = getStintCapacity(s, st, 'eco');
@@ -3971,7 +4036,7 @@ function cascadeFixPitWindows(isLapIncrease = false, manualSplitIdx = -1, manual
             let lastStint = split.stints[split.stints.length - 1];
 
             // 🚀 LE FIX : On demande la permission au détecteur avant d'imaginer une capacité Éco !
-            let canUseEcoExt = hasEcoData(split.driver);
+            let canUseEcoExt = hasEcoData(split.driver, lastStint.tire);
             let pushCap = getStintCapacity(i, split.stints.length - 1, 'push');
             let ecoCap = canUseEcoExt ? getStintCapacity(i, split.stints.length - 1, 'eco') : 0;
 

@@ -3052,6 +3052,9 @@ function optimizeStrategyFilling() {
 }
 
 function initStrategyData() {
+    // 🚀 LE MUSÈLEMENT DU BÂTISSEUR : Il n'intervient QUE si le tableau est totalement vide !
+    if (strategySplits.length > 0) return;
+
     let maxConsecutive = Math.max(1, parseInt(document.getElementById('max-consecutive-splits')?.value) || 1);
     const numSplits = parseInt(document.getElementById('total-splits')?.value) || 1;
     if (strategySplits.length === numSplits) return; // Sécurité de non-destruction

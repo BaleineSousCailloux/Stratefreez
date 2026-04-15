@@ -2000,17 +2000,16 @@ function openSmartThresholdModal() {
 }
 
 function cancelSmartThreshold() {
-    clearInterval(techWatchdogTimer);
-    document.getElementById('smart-threshold-modal').classList.add('hidden');
-
-    if (pendingTechChange) {
+    if (pendingTechChange && pendingTechChange.input) {
+        // 1. On remet la valeur d'origine
         pendingTechChange.input.value = pendingTechChange.oldRawValue;
 
-        // 🚀 On utilise VOTRE fonction pour remettre le formatage visuel
-        if (typeof applyFormatters === 'function') applyFormatters();
-
-        pendingTechChange = null;
+        // 2. FIX BLUR : On force le formatage sur cet input précis
+        // On déclenche l'événement 'blur' manuellement pour que votre logique existante s'exécute
+        pendingTechChange.input.dispatchEvent(new Event('blur'));
     }
+    closeSmartThresholdModal();
+    pendingTechChange = null;
 }
 
 function confirmSmartThreshold() {
@@ -2018,6 +2017,9 @@ function confirmSmartThreshold() {
     document.getElementById('smart-threshold-modal').classList.add('hidden');
 
     if (pendingTechChange) {
+        // 1. 🚀 FIX VISUEL : On maquille la saisie (ex: 203000 -> 02:03.000)
+        pendingTechChange.input.dispatchEvent(new Event('blur'));
+
         // 1. On synchronise la valeur forcée
         applyGlobalTechSync(pendingTechChange.input);
 
@@ -2027,13 +2029,24 @@ function confirmSmartThreshold() {
         renderStrategy();
         if (typeof triggerCloudSync === 'function') triggerCloudSync();
 
-        // 3. On formate visuellement le champ
-        if (typeof applyFormatters === 'function') applyFormatters();
-
-        // 4. On met à jour la mémoire du Juge pour qu'il accepte cette nouvelle base
+        // 4. Mise à jour de la mémoire du Juge pour qu'il accepte cette nouvelle base
         if (techInputMemory) {
-            techInputMemory.rawValue = pendingTechChange.input.value;
-            techInputMemory.parsedValue = timeStringToSeconds(pendingTechChange.input.value) * 1000;
+            const input = pendingTechChange.input;
+            const isTime = input.classList.contains('format-mss000');
+            const isFuel = input.classList.contains('format-lpt') || input.id.includes('fuel-') || input.id.includes('cons-');
+            const isLife = input.classList.contains('global-tire-life') || input.classList.contains('driver-tire-life') || input.id.includes('life-');
+
+            // On mémorise le texte brut tel qu'il est dans la case APRÈS le blur
+            techInputMemory.rawValue = input.value;
+
+            // On recalcule la valeur numérique avec la même logique que le Juge
+            if (isTime) {
+                techInputMemory.parsedValue = timeStringToSeconds(input.value) * 1000;
+            } else if (isFuel) {
+                techInputMemory.parsedValue = parseFloat(input.value.replace(',', '.')) || 0;
+            } else {
+                techInputMemory.parsedValue = parseInt(input.value) || 0;
+            }
         }
 
         pendingTechChange = null;
@@ -2041,26 +2054,18 @@ function confirmSmartThreshold() {
 }
 function formatValueForModal(val, isTime, isFuel, isLife) {
     if (isTime) {
-        // 🚀 On reproduit exactement la logique de vos champs .format-mss000
-        let totalMs = Math.round(val);
-        let m = Math.floor(totalMs / 60000);
-        let s = Math.floor((totalMs % 60000) / 1000);
-        let ms = totalMs % 1000;
+        // val arrive ici en ms (ex: 123000)
+        let totalSeconds = Math.floor(val / 1000); // ➔ 123
+        let ms = Math.floor(val % 1000);           // ➔ 000
 
-        // Formatage MM:SS.sss (ex: 02:03.000)
+        let m = Math.floor(totalSeconds / 60);     // ➔ 2
+        let s = totalSeconds % 60;                // ➔ 3
+
+        // Retourne 02:03.000
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
     }
-
-    if (isFuel) {
-        // 🚀 On reproduit la logique .format-lpt (2 décimales + unité)
-        return val.toFixed(2) + " L/t";
-    }
-
-    if (isLife) {
-        // 🚀 On reproduit la logique des tours
-        return val + " Tours";
-    }
-
+    if (isFuel) return val.toFixed(2) + " L/t";
+    if (isLife) return val + " Tours";
     return val;
 }
 

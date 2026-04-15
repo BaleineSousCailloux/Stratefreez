@@ -1890,9 +1890,9 @@ function handleTechFormFocus(e) {
         let isFuel = input.classList.contains('format-lpt') || input.id.includes('fuel-') || input.id.includes('cons-');
         let isLife = input.classList.contains('global-tire-life') || input.classList.contains('driver-tire-life') || input.id.includes('life-');
 
-        // On utilise timeStringToSeconds pour la photo de départ si c'est un chrono
+        // 🚀 FIX : On utilise le parseur de chronos
         let parsed;
-        if (isTime) parsed = timeStringToSeconds(input.value) * 1000;
+        if (isTime) parsed = parseLapTime(input.value); // Plus de *1000, parseLapTime le fait déjà
         else if (isFuel) parsed = parseFloat(input.value.replace(',', '.')) || 0;
         else parsed = parseInt(input.value) || 0;
 
@@ -1934,7 +1934,7 @@ function handleTechFormChange(e) {
     // 🚀 MODIFICATION 1 : Utilisation de VOTRE fonction de lecture
     let newVal;
     if (isTime) {
-        newVal = timeStringToSeconds(input.value) * 1000; // Conversion en ms pour la comparaison
+        newVal = parseLapTime(input.value); // 🚀 FIX : On utilise le parseur de chronos
     } else if (isFuel) {
         newVal = parseFloat(input.value.replace(',', '.')) || 0;
     } else {
@@ -2042,7 +2042,7 @@ function confirmSmartThreshold() {
 
             // On recalcule la valeur numérique avec la même logique que le Juge
             if (isTime) {
-                techInputMemory.parsedValue = timeStringToSeconds(input.value) * 1000;
+                techInputMemory.parsedValue = parseLapTime(input.value); // 🚀 FIX : On utilise le parseur de chronos
             } else if (isFuel) {
                 techInputMemory.parsedValue = parseFloat(input.value.replace(',', '.')) || 0;
             } else {
@@ -2068,6 +2068,27 @@ function formatValueForModal(val, isTime, isFuel, isLife) {
     if (isFuel) return val.toFixed(2) + " L/t";
     if (isLife) return val + " Tours";
     return val;
+}
+// 🚀 PARSEUR SPÉCIAL ONGLET TECHNIQUE (Comprend le format MM:SS.ms et la frappe 203000)
+function parseLapTime(valStr) {
+    if (!valStr) return 0;
+
+    // Cas 1 : La case est déjà formatée (ex: "2:03.000")
+    if (valStr.includes(':')) {
+        let parts = valStr.split(':');
+        if (parts.length === 2) return (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000;
+        if (parts.length === 3) return (parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])) * 1000;
+    }
+
+    // Cas 2 : L'utilisateur vient de taper (ex: "203000")
+    let val = valStr.replace(/\D/g, '');
+    if (val.length >= 4) {
+        let ms = parseInt(val.slice(-3)) || 0;
+        let s = parseInt(val.slice(-5, -3)) || 0;
+        let m = parseInt(val.slice(0, -5)) || 0;
+        return (m * 60 + s) * 1000 + ms; // Retourne le résultat directement en millisecondes
+    }
+    return 0;
 }
 
 // ==========================================

@@ -1890,10 +1890,16 @@ function handleTechFormFocus(e) {
         let isFuel = input.classList.contains('format-lpt') || input.id.includes('fuel-') || input.id.includes('cons-');
         let isLife = input.classList.contains('global-tire-life') || input.classList.contains('driver-tire-life') || input.id.includes('life-');
 
+        // On utilise timeStringToSeconds pour la photo de départ si c'est un chrono
+        let parsed;
+        if (isTime) parsed = timeStringToSeconds(input.value) * 1000;
+        else if (isFuel) parsed = parseFloat(input.value.replace(',', '.')) || 0;
+        else parsed = parseInt(input.value) || 0;
+
         techInputMemory = {
             id: input.id,
             rawValue: input.value,
-            parsedValue: parseTechValue(input.value, isTime, isFuel, isLife)
+            parsedValue: parsed
         };
     }
 }
@@ -1902,20 +1908,17 @@ function handleTechFormChange(e) {
     if (!isEngineerMode) return;
 
     let input = e.target;
-    // On laisse passer tout ce qui n'est pas un champ de saisie direct (ex: les cases à cocher)
     if (input.tagName !== 'INPUT' || input.type === 'checkbox') {
         processGlobalDataChange();
         return;
     }
 
-    // RÈGLE A : Le tableau doit être construit, sinon feu vert direct.
     if (!isFirstStrategyBuilt) {
         applyGlobalTechSync(input);
         processGlobalDataChange();
         return;
     }
 
-    // RÈGLE A (Suite) : L'ancienne valeur doit exister et être > 0 (Pas de punition sur une case vierge)
     if (!techInputMemory || techInputMemory.id !== input.id || techInputMemory.parsedValue === 0) {
         applyGlobalTechSync(input);
         processGlobalDataChange();
@@ -1927,52 +1930,42 @@ function handleTechFormChange(e) {
     let isLife = input.classList.contains('global-tire-life') || input.classList.contains('driver-tire-life') || input.id.includes('life-');
 
     let oldVal = techInputMemory.parsedValue;
-    let newVal = parseTechValue(input.value, isTime, isFuel, isLife);
 
-    // RÈGLE B : Évaluation du Juge
+    // 🚀 MODIFICATION 1 : Utilisation de VOTRE fonction de lecture
+    let newVal;
+    if (isTime) {
+        newVal = timeStringToSeconds(input.value) * 1000; // Conversion en ms pour la comparaison
+    } else if (isFuel) {
+        newVal = parseFloat(input.value.replace(',', '.')) || 0;
+    } else {
+        newVal = parseInt(input.value) || 0;
+    }
+
     let isExceeded = false;
     if (isTime) {
-        if (Math.abs(newVal - oldVal) > 5000) isExceeded = true; // Tolérance : +/- 5 secondes (5000 ms)
+        if (Math.abs(newVal - oldVal) > 5000) isExceeded = true;
     } else if (isFuel) {
-        if (Math.abs(newVal - oldVal) > 1.0) isExceeded = true; // Tolérance : +/- 1.0 L/t
+        if (Math.abs(newVal - oldVal) > 1.0) isExceeded = true;
     } else if (isLife) {
-        if (Math.abs(newVal - oldVal) > 2) isExceeded = true; // Tolérance : +/- 2 tours
+        if (Math.abs(newVal - oldVal) > 2) isExceeded = true;
     }
 
     if (isExceeded) {
-        // 🔴 MISE EN QUARANTAINE
         pendingTechChange = {
             input: input,
             oldRawValue: techInputMemory.rawValue
         };
+
+        // 🚀 MODIFICATION 2 : Miroir visuel utilisant VOTRE fonction formatTime
+        // (On divise newVal par 1000 car formatTime attend des secondes)
+        document.getElementById('modal-old-val').innerText = isTime ? formatTime(oldVal / 1000) : formatValueForModal(oldVal, false, isFuel, isLife);
+        document.getElementById('modal-new-val').innerText = isTime ? formatTime(newVal / 1000) : formatValueForModal(newVal, false, isFuel, isLife);
+
         openSmartThresholdModal();
     } else {
-        // 🟢 FEU VERT INSTANTANÉ
         applyGlobalTechSync(input);
         processGlobalDataChange();
     }
-}
-
-function parseTechValue(valStr, isTime, isFuel, isLife) {
-    if (!valStr) return 0;
-    if (isTime) {
-        if (valStr.includes(':')) {
-            let parts = valStr.split(':');
-            if (parts.length === 2) return (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000;
-            if (parts.length === 3) return (parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])) * 1000;
-        }
-        let val = valStr.replace(/\D/g, '');
-        if (val.length >= 4) {
-            let ms = parseInt(val.slice(-3)) || 0;
-            let s = parseInt(val.slice(-5, -3)) || 0;
-            let m = parseInt(val.slice(0, -5)) || 0;
-            return (m * 60 + s) * 1000 + ms;
-        }
-        return 0;
-    }
-    if (isFuel) return parseFloat(valStr.replace(',', '.').replace(/[^\d.]/g, '')) || 0;
-    if (isLife) return parseInt(valStr.replace(/\D/g, '')) || 0;
-    return 0;
 }
 
 function applyGlobalTechSync(input) {
@@ -2014,11 +2007,8 @@ function cancelSmartThreshold() {
     if (pendingTechChange) {
         pendingTechChange.input.value = pendingTechChange.oldRawValue;
 
-        // 🚀 FIX VISUEL : On simule une sortie de case pour forcer le re-formatage (132000 -> 01:32.000)
-        pendingTechChange.input.dispatchEvent(new Event('blur'));
-
-        // 🚀 FIX SÉCURITÉ : On relance le moteur sur l'ancienne valeur pour purger la donnée aberrante de la mémoire
-        processGlobalDataChange();
+        // 🚀 On utilise VOTRE fonction pour remettre le formatage visuel
+        if (typeof applyFormatters === 'function') applyFormatters();
 
         pendingTechChange = null;
     }
@@ -2029,22 +2019,35 @@ function confirmSmartThreshold() {
     document.getElementById('smart-threshold-modal').classList.add('hidden');
 
     if (pendingTechChange) {
-        // 🚀 VOTRE IDÉE (Le Fix Visuel) : On simule la sortie de case pour forcer le formateur à remettre les ":"
-        pendingTechChange.input.dispatchEvent(new Event('blur'));
+        // 1. On synchronise la valeur forcée
         applyGlobalTechSync(pendingTechChange.input);
-        processGlobalDataChange(); // Lancement manuel de la sauvegarde
-        // 🚀 MISE À JOUR DE LA MÉMOIRE : On dit au Juge que cette nouvelle valeur extrême est désormais la norme
-        // (Pour éviter qu'il ne re-déclenche si on reclique dans la case juste après)
+
+        // 2. 🚀 ON FORCE LA CASCADE (Appel direct)
+        cascadeFixPitWindows();
+        saveFormState();
+        renderStrategy();
+        if (typeof triggerCloudSync === 'function') triggerCloudSync();
+
+        // 3. On formate visuellement le champ
+        if (typeof applyFormatters === 'function') applyFormatters();
+
+        // 4. On met à jour la mémoire du Juge pour qu'il accepte cette nouvelle base
         if (techInputMemory) {
             techInputMemory.rawValue = pendingTechChange.input.value;
-            let isTime = pendingTechChange.input.classList.contains('format-mss000');
-            let isFuel = pendingTechChange.input.classList.contains('format-lpt') || pendingTechChange.input.id.includes('fuel-') || pendingTechChange.input.id.includes('cons-');
-            let isLife = pendingTechChange.input.classList.contains('global-tire-life') || pendingTechChange.input.classList.contains('driver-tire-life') || pendingTechChange.input.id.includes('life-');
-            techInputMemory.parsedValue = parseTechValue(pendingTechChange.input.value, isTime, isFuel, isLife);
+            techInputMemory.parsedValue = timeStringToSeconds(pendingTechChange.input.value) * 1000;
         }
 
         pendingTechChange = null;
     }
+}
+function formatValueForModal(val, isTime, isFuel, isLife) {
+    if (isTime) {
+        // Vos chronos sont stockés en ms dans le Juge, formatTime attend des secondes
+        return formatTime(val / 1000);
+    }
+    if (isFuel) return val.toFixed(2) + " L/t";
+    if (isLife) return val + " Tours";
+    return val;
 }
 
 // ==========================================

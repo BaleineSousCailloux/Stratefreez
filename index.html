@@ -731,10 +731,18 @@
     <div id="smart-threshold-modal" class="modal hidden">
         <div class="modal-content border-top-warning modal-wide">
             <h3 class="modal-title-red text-warning">⚠️ MODIFICATION MAJEURE</h3>
-            <p class="modal-confirm-text mt-15 mb-20 text-left" style="font-weight: normal;">
-                Cette valeur présente un <strong class="text-warning">écart important</strong> par rapport à l'ancienne.<br><br>
-                La course va être recalculée en fonction de cette nouvelle donnée.<br><br>
-                Voulez-vous vraiment appliquer cette modification ?
+            <p class="modal-confirm-text mt-15 text-left" style="font-weight: normal;">
+                Votre saisie implique une <strong class="text-warning">modification importante</strong> :
+            </p>
+
+            <div class="text-center mt-15 mb-20 fs-12" style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+                <span id="modal-old-val" style="text-decoration: line-through; color: #888;"></span>
+                <span class="material-symbols-outlined" style="vertical-align: middle; margin: 0 10px; color: #ff9800;">arrow_forward</span>
+                <strong id="modal-new-val" class="text-warning" style="font-size: 1.2em;"></strong>
+            </div>
+
+            <p class="modal-confirm-text mb-20 text-left" style="font-weight: normal;">
+                Confirmez-vous cette modification ?
             </p>
             <div class="justify-space-around d-flex">
                 <button class="action-btn btn-grey" onclick="cancelSmartThreshold()">Annuler <span id="smart-threshold-countdown" class="fs-08">(45s)</span></button>

@@ -20,57 +20,35 @@ let liveStandbyTimeout = null;
 let isFirstStrategyBuilt = false;
 let isFlashMessageAlive = false; // Permet au chrono de savoir si un message bloque la zone
 let cloudFlashLockUntil = 0; // Mémoire du verrou Cloud
+// 🚀 NOUVELLES VARIABLES : Poste de Douane (Onglet Technique)
+let techInputMemory = null;
+let techWatchdogTimer = null;
+let pendingTechChange = null;
 
 // ==========================================
 // --- NOUVEAU : HORLOGE ATOMIQUE (0 Quota) ---
 // ==========================================
 let serverOffset = 0; // Le décalage de la carte mère en millisecondes
 
-async function calibrateTime() {
-    let start = Date.now();
+// 🚀 LE NOUVEAU MAÎTRE DU TEMPS (Version Blindée Firebase)
+function calibrateTime() {
+    const offsetRef = firebase.database().ref(".info/serverTimeOffset");
+    const connectedRef = firebase.database().ref(".info/connected");
 
-    try {
-        // 🚀 PLAN A : API moderne + Cache-Buster absolu 
-        // (Attention : on utilise '&_=' car l'URL contient déjà un paramètre '?timeZone=UTC')
-        let res = await fetch('https://timeapi.io/api/Time/current/zone?timeZone=UTC&_=' + start, {
-            method: 'GET',
-            cache: 'no-store'
-        });
-        let data = await res.json();
+    // 1. Le Radar de Temps (S'ajuste silencieusement)
+    offsetRef.on("value", (snap) => {
+        serverOffset = snap.val() || 0;
+    });
 
-        if (data && data.dateTime) {
-            // Ajout du "Z" pour forcer la lecture en UTC absolu
-            let serverTime = new Date(data.dateTime + "Z").getTime();
-            let latency = (Date.now() - start) / 2;
-            serverOffset = serverTime - (start + latency);
-            console.log("⏱️ Horloge atomique (Plan A) calibrée ! Décalage : " + serverOffset + "ms");
-            return; // Succès, on s'arrête là !
+    // 2. Le Radar de Connexion (Gère les Logs et la Sécurité Anti-Crash)
+    connectedRef.on("value", (snap) => {
+        if (snap.val() === true) {
+            console.log("🟢 [Horloge] Connecté à Firebase ! Décalage atomique : " + serverOffset + "ms");
+        } else {
+            serverOffset = 0; // 🛡️ SÉCURITÉ : Retour à l'horloge système brute
+            console.warn("🔴 [Horloge] Déconnecté du serveur. Passage sur l'horloge système (Décalage : 0ms).");
         }
-    } catch (e1) {
-        console.warn("⚠️ API externe bloquée (CORS/Adblock). Passage au Plan B...");
-    }
-
-    try {
-        // 🛡️ PLAN B : Serveur local + Cache-Buster absolu
-        // On s'assure d'abord de nettoyer l'URL actuelle s'il y a déjà des paramètres, puis on ajoute notre astuce
-        let cleanUrl = window.location.href.split('?')[0];
-        let res2 = await fetch(cleanUrl + '?_=' + start, {
-            method: 'HEAD',
-            cache: 'no-store'
-        });
-        let dateHeader = res2.headers.get('Date');
-
-        if (dateHeader) {
-            let serverTime = new Date(dateHeader).getTime();
-            let latency = (Date.now() - start) / 2;
-            serverOffset = serverTime - (start + latency);
-            console.log("⏱️ Horloge locale (Plan B) calibrée ! Décalage : " + serverOffset + "ms");
-        }
-    } catch (e2) {
-        // Si vraiment on n'a pas internet du tout
-        serverOffset = 0;
-        console.error("⚠️ Calibrage réseau impossible. Utilisation de l'horloge système brute.");
-    }
+    });
 }
 
 // La fonction magique qui remplace le "Date.now()" classique
@@ -825,7 +803,6 @@ window.addEventListener('online', () => {
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     calibrateTime(); // 🚀 ON CALIBRE L'HORLOGE DÈS L'OUVERTURE
-    bindGlobalSyncEvents();
     applyMobileNumericKeypad(); // 🚀 APPLICATION DU CLAVIER DÉCIMAL MOBILE
     let timerStr = localStorage.getItem('stratefreez-timer');
     let isTimerRunning = timerStr ? JSON.parse(timerStr).active : false;
@@ -873,7 +850,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // 🚀 ÉCOUTE GLOBALE DES MODIFICATIONS (Onglets 1 & 2)
     document.getElementById('form-params')?.addEventListener('change', processGlobalDataChange);
-    document.getElementById('form-tech')?.addEventListener('change', processGlobalDataChange);
+    // 🚀 LE POSTE DE DOUANE : On débranche la ligne directe pour l'onglet Technique
+    document.getElementById('form-tech')?.addEventListener('change', handleTechFormChange);
+    document.getElementById('form-tech')?.addEventListener('focusin', handleTechFormFocus);
 });
 
 // ==========================================
@@ -1900,26 +1879,158 @@ function applyFormatters() {
     });
 }
 
-function bindGlobalSyncEvents() {
-    ['eco', 'push'].forEach(f => {
-        const globalInput = document.getElementById(`cons-${f}`);
-        if (globalInput) {
-            globalInput.addEventListener('blur', function () {
-                document.querySelectorAll(`.driver-fuel-${f}`).forEach(drv => { drv.value = this.value; });
-                saveFormState();
-            });
+// ==========================================
+// --- LE POSTE DE DOUANE (Smart Threshold Onglet 2) ---
+// ==========================================
+
+function handleTechFormFocus(e) {
+    let input = e.target;
+    if (input.tagName === 'INPUT' && (input.type === 'text' || input.type === 'number')) {
+        let isTime = input.classList.contains('format-mss000');
+        let isFuel = input.classList.contains('format-lpt') || input.id.includes('fuel-') || input.id.includes('cons-');
+        let isLife = input.classList.contains('global-tire-life') || input.classList.contains('driver-tire-life') || input.id.includes('life-');
+
+        techInputMemory = {
+            id: input.id,
+            rawValue: input.value,
+            parsedValue: parseTechValue(input.value, isTime, isFuel, isLife)
+        };
+    }
+}
+
+function handleTechFormChange(e) {
+    if (!isEngineerMode) return;
+
+    let input = e.target;
+    // On laisse passer tout ce qui n'est pas un champ de saisie direct (ex: les cases à cocher)
+    if (input.tagName !== 'INPUT' || input.type === 'checkbox') {
+        processGlobalDataChange();
+        return;
+    }
+
+    // RÈGLE A : Le tableau doit être construit, sinon feu vert direct.
+    if (!isFirstStrategyBuilt) {
+        applyGlobalTechSync(input);
+        processGlobalDataChange();
+        return;
+    }
+
+    // RÈGLE A (Suite) : L'ancienne valeur doit exister et être > 0 (Pas de punition sur une case vierge)
+    if (!techInputMemory || techInputMemory.id !== input.id || techInputMemory.parsedValue === 0) {
+        applyGlobalTechSync(input);
+        processGlobalDataChange();
+        return;
+    }
+
+    let isTime = input.classList.contains('format-mss000');
+    let isFuel = input.classList.contains('format-lpt') || input.id.includes('fuel-') || input.id.includes('cons-');
+    let isLife = input.classList.contains('global-tire-life') || input.classList.contains('driver-tire-life') || input.id.includes('life-');
+
+    let oldVal = techInputMemory.parsedValue;
+    let newVal = parseTechValue(input.value, isTime, isFuel, isLife);
+
+    // RÈGLE B : Évaluation du Juge
+    let isExceeded = false;
+    if (isTime) {
+        if (Math.abs(newVal - oldVal) > 5000) isExceeded = true; // Tolérance : +/- 5 secondes (5000 ms)
+    } else if (isFuel) {
+        if (Math.abs(newVal - oldVal) > 1.0) isExceeded = true; // Tolérance : +/- 1.0 L/t
+    } else if (isLife) {
+        if (Math.abs(newVal - oldVal) > 2) isExceeded = true; // Tolérance : +/- 2 tours
+    }
+
+    if (isExceeded) {
+        // 🔴 MISE EN QUARANTAINE
+        pendingTechChange = {
+            input: input,
+            oldRawValue: techInputMemory.rawValue
+        };
+        openSmartThresholdModal();
+    } else {
+        // 🟢 FEU VERT INSTANTANÉ
+        applyGlobalTechSync(input);
+        processGlobalDataChange();
+    }
+}
+
+function parseTechValue(valStr, isTime, isFuel, isLife) {
+    if (!valStr) return 0;
+    if (isTime) {
+        if (valStr.includes(':')) {
+            let parts = valStr.split(':');
+            if (parts.length === 2) return (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000;
+            if (parts.length === 3) return (parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])) * 1000;
         }
+        let val = valStr.replace(/\D/g, '');
+        if (val.length >= 4) {
+            let ms = parseInt(val.slice(-3)) || 0;
+            let s = parseInt(val.slice(-5, -3)) || 0;
+            let m = parseInt(val.slice(0, -5)) || 0;
+            return (m * 60 + s) * 1000 + ms;
+        }
+        return 0;
+    }
+    if (isFuel) return parseFloat(valStr.replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+    if (isLife) return parseInt(valStr.replace(/\D/g, '')) || 0;
+    return 0;
+}
+
+function applyGlobalTechSync(input) {
+    let id = input.id;
+    let val = input.value;
+
+    ['eco', 'push'].forEach(f => {
+        if (id === `cons-${f}`) document.querySelectorAll(`.driver-fuel-${f}`).forEach(drv => { drv.value = val; });
     });
     ['T', 'M', 'D', 'I', 'P'].forEach(t => {
-        const gp = document.getElementById(`global-time-push-${t}`);
-        const ge = document.getElementById(`global-time-eco-${t}`);
-        const gl = document.getElementById(`global-life-${t}`);
-
-        if (gp) { gp.addEventListener('blur', function () { document.querySelectorAll(`.driver-lap-time-push[data-tire="${t}"]`).forEach(drv => { drv.value = this.value; }); saveFormState(); }); }
-        if (ge) { ge.addEventListener('blur', function () { document.querySelectorAll(`.driver-lap-time-eco[data-tire="${t}"]`).forEach(drv => { drv.value = this.value; }); saveFormState(); }); }
-        if (gl) { gl.addEventListener('blur', function () { document.querySelectorAll(`.driver-tire-life[data-tire="${t}"]`).forEach(drv => { drv.value = this.value; }); saveFormState(); }); }
+        if (id === `global-time-push-${t}`) document.querySelectorAll(`.driver-lap-time-push[data-tire="${t}"]`).forEach(drv => { drv.value = val; });
+        if (id === `global-time-eco-${t}`) document.querySelectorAll(`.driver-lap-time-eco[data-tire="${t}"]`).forEach(drv => { drv.value = val; });
+        if (id === `global-life-${t}`) document.querySelectorAll(`.driver-tire-life[data-tire="${t}"]`).forEach(drv => { drv.value = val; });
     });
 }
+
+function openSmartThresholdModal() {
+    let modal = document.getElementById('smart-threshold-modal');
+    let countdownEl = document.getElementById('smart-threshold-countdown');
+    modal.classList.remove('hidden');
+
+    let timeLeft = 45;
+    countdownEl.innerText = `(${timeLeft}s)`;
+
+    clearInterval(techWatchdogTimer);
+    techWatchdogTimer = setInterval(() => {
+        timeLeft--;
+        countdownEl.innerText = `(${timeLeft}s)`;
+        if (timeLeft <= 0) {
+            cancelSmartThreshold();
+        }
+    }, 1000);
+}
+
+function cancelSmartThreshold() {
+    clearInterval(techWatchdogTimer);
+    document.getElementById('smart-threshold-modal').classList.add('hidden');
+
+    if (pendingTechChange) {
+        pendingTechChange.input.value = pendingTechChange.oldRawValue; // Restauration silencieuse de la photo
+        pendingTechChange = null;
+    }
+}
+
+function confirmSmartThreshold() {
+    clearInterval(techWatchdogTimer);
+    document.getElementById('smart-threshold-modal').classList.add('hidden');
+
+    if (pendingTechChange) {
+        applyGlobalTechSync(pendingTechChange.input);
+        processGlobalDataChange(); // Lancement manuel de la sauvegarde
+        pendingTechChange = null;
+    }
+}
+
+// ==========================================
+// --- MOTEUR LIVE TIMING & SPOTTER (requestAnimationFrame) ---
+// ==========================================
 
 // ==========================================
 // --- MOTEUR LIVE TIMING & SPOTTER (requestAnimationFrame) ---

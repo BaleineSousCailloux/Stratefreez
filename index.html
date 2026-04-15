@@ -728,6 +728,20 @@
             </div>
         </div>
     </div>
+    <div id="smart-threshold-modal" class="modal hidden">
+        <div class="modal-content border-top-warning modal-wide">
+            <h3 class="modal-title-red text-warning">⚠️ MODIFICATION MAJEURE</h3>
+            <p class="modal-confirm-text mt-15 mb-20 text-left" style="font-weight: normal;">
+                Cette valeur présente un <strong class="text-warning">écart important</strong> par rapport à l'ancienne.<br><br>
+                La course va être recalculée en fonction de cette nouvelle donnée.<br><br>
+                Voulez-vous vraiment appliquer cette modification ?
+            </p>
+            <div class="justify-space-around d-flex">
+                <button class="action-btn btn-grey" onclick="cancelSmartThreshold()">Annuler <span id="smart-threshold-countdown" class="fs-08">(45s)</span></button>
+                <button class="action-btn btn-warning" onclick="confirmSmartThreshold()">CONFIRMER</button>
+            </div>
+        </div>
+    </div>
     <div id="flash-input-modal" class="modal hidden">
         <div class="modal-content border-top-warning text-center">
             <h3 class="text-warning m-0"><span class="material-symbols-outlined icon-align-middle mr-8">maps_ugc</span>MESSAGE FLASH</h3>
@@ -749,6 +763,7 @@
     </div>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script>
         // Your web app's Firebase configuration
         const firebaseConfig = {

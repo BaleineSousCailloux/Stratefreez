@@ -1951,9 +1951,16 @@ function handleTechFormChange(e) {
     }
 
     if (isExceeded) {
+        let dangerousSaisie = input.value; // 1. On capture la saisie de l'utilisateur
+
+        // 2. 🚀 QUARANTAINE IMMÉDIATE : On remet l'ancienne valeur dans la case pour berner le Cloud
+        input.value = techInputMemory.rawValue;
+
+        // 3. On stocke la valeur dangereuse en mémoire, pas dans le DOM
         pendingTechChange = {
             input: input,
-            oldRawValue: techInputMemory.rawValue
+            oldRawValue: techInputMemory.rawValue,
+            newRawValue: dangerousSaisie
         };
 
         // 🚀 FIX : Utilisation du traducteur dédié MM:SS.sss
@@ -2002,14 +2009,6 @@ function openSmartThresholdModal() {
 function cancelSmartThreshold() {
     clearInterval(techWatchdogTimer);
     document.getElementById('smart-threshold-modal').classList.add('hidden');
-    if (pendingTechChange && pendingTechChange.input) {
-        // 1. On remet la valeur d'origine
-        pendingTechChange.input.value = pendingTechChange.oldRawValue;
-
-        // 2. FIX BLUR : On force le formatage sur cet input précis
-        // On déclenche l'événement 'blur' manuellement pour que votre logique existante s'exécute
-        pendingTechChange.input.dispatchEvent(new Event('blur'));
-    }
     pendingTechChange = null;
 }
 
@@ -2018,13 +2017,16 @@ function confirmSmartThreshold() {
     document.getElementById('smart-threshold-modal').classList.add('hidden');
 
     if (pendingTechChange) {
-        // 1. 🚀 FIX VISUEL : On maquille la saisie (ex: 203000 -> 02:03.000)
+        // 🚀 RÉINJECTION : On valide, donc on remet la valeur extrême dans la case
+        pendingTechChange.input.value = pendingTechChange.newRawValue;
+
+        // 1. FIX VISUEL : On maquille la saisie
         pendingTechChange.input.dispatchEvent(new Event('blur'));
 
-        // 1. On synchronise la valeur forcée
+        // 2. On synchronise la valeur forcée
         applyGlobalTechSync(pendingTechChange.input);
 
-        // 2. 🚀 ON FORCE LA CASCADE (Appel direct)
+        // 3. 🚀 ON FORCE LA CASCADE (Appel direct)
         cascadeFixPitWindows();
         saveFormState();
         renderStrategy();

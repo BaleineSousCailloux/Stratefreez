@@ -760,7 +760,7 @@ function handlePadlockClick() {
         if (hasPassport) {
             isEngineerMode = true;
             toggleObserverMode(false); // Déverrouillage instantané !
-            navigateToSmartTab();
+            // navigateToSmartTab();
         } else {
             // Pas de passeport ? On demande le code PIN
             document.getElementById('pin-auth-input').value = '';
@@ -783,7 +783,7 @@ function confirmPinAuth() {
         localStorage.setItem(`stratefreez-passport-${currentRaceId}`, 'true');
         toggleObserverMode(false);
         closePinAuthModal();
-        navigateToSmartTab(); // 🚀 REDIRECTION INTELLIGENTE
+        // navigateToSmartTab(); // 🚀 REDIRECTION INTELLIGENTE
     } else {
         document.getElementById('pin-error-msg').classList.remove('hidden');
     }
@@ -2204,7 +2204,7 @@ function timerTick() {
 
     let navTitle = document.getElementById('nav-brand-text');
     if (navTitle) {
-        let realElapsed = Math.round(elapsed / 1000); // 🚀 Affichage
+        let realElapsed = Math.floor(elapsed / 1000); // 🚀 Affichage
         let eh = String(Math.floor(realElapsed / 3600)).padStart(2, '0');
         let em = String(Math.floor((realElapsed % 3600) / 60)).padStart(2, '0');
         let es = String(Math.floor(realElapsed % 60)).padStart(2, '0');
@@ -2384,7 +2384,7 @@ function updateLiveSpotter(elapsed, timerState) {
 
         let tgtLapEl = document.getElementById('live-target-lap'); if (tgtLapEl) tgtLapEl.innerText = activeStint.endLap || 0;
 
-        let realEnd = Math.round(activeStint.endSec / 1000); // 🚀 Affichage
+        let realEnd = Math.floor(activeStint.endSec / 1000); // 🚀 Affichage
         let targetH = String(Math.floor(realEnd / 3600)).padStart(2, '0');
         let targetM = String(Math.floor((realEnd % 3600) / 60)).padStart(2, '0');
         let targetS = String(Math.floor(realEnd % 60)).padStart(2, '0');
@@ -2393,7 +2393,15 @@ function updateLiveSpotter(elapsed, timerState) {
         let timeRem = activeStint.endSec - elapsed;
         if (activeStint.isPitted && activeStint.lockedTimeSec !== null) timeRem = 0;
         let sign = timeRem < 0 ? "+" : "-";
-        let absRem = Math.round(Math.abs(timeRem) / 1000); // 🚀 Affichage
+        // 🚀 LE SABLIER PARFAIT : 
+        // - S'il reste du temps (compte à rebours), on arrondit au plafond (Ceil) pour ne pas afficher 0 trop tôt.
+        // - Si on est en dépassement (chronomètre), on tronque au plancher (Floor) pour compter les secondes pleines.
+        let absRem;
+        if (timeRem >= 0) {
+            absRem = Math.ceil(timeRem / 1000);
+        } else {
+            absRem = Math.floor(Math.abs(timeRem) / 1000);
+        }
         let rh = String(Math.floor(absRem / 3600)).padStart(2, '0');
         let rm = String(Math.floor((absRem % 3600) / 60)).padStart(2, '0');
         let rs = String(Math.floor(absRem % 60)).padStart(2, '0');

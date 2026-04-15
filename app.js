@@ -2000,6 +2000,8 @@ function openSmartThresholdModal() {
 }
 
 function cancelSmartThreshold() {
+    clearInterval(techWatchdogTimer);
+    document.getElementById('smart-threshold-modal').classList.add('hidden');
     if (pendingTechChange && pendingTechChange.input) {
         // 1. On remet la valeur d'origine
         pendingTechChange.input.value = pendingTechChange.oldRawValue;
@@ -2008,7 +2010,6 @@ function cancelSmartThreshold() {
         // On déclenche l'événement 'blur' manuellement pour que votre logique existante s'exécute
         pendingTechChange.input.dispatchEvent(new Event('blur'));
     }
-    closeSmartThresholdModal();
     pendingTechChange = null;
 }
 
@@ -2068,10 +2069,6 @@ function formatValueForModal(val, isTime, isFuel, isLife) {
     if (isLife) return val + " Tours";
     return val;
 }
-
-// ==========================================
-// --- MOTEUR LIVE TIMING & SPOTTER (requestAnimationFrame) ---
-// ==========================================
 
 // ==========================================
 // --- MOTEUR LIVE TIMING & SPOTTER (requestAnimationFrame) ---

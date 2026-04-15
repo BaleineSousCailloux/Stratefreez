@@ -2012,7 +2012,14 @@ function cancelSmartThreshold() {
     document.getElementById('smart-threshold-modal').classList.add('hidden');
 
     if (pendingTechChange) {
-        pendingTechChange.input.value = pendingTechChange.oldRawValue; // Restauration silencieuse de la photo
+        pendingTechChange.input.value = pendingTechChange.oldRawValue;
+
+        // 🚀 FIX VISUEL : On simule une sortie de case pour forcer le re-formatage (132000 -> 01:32.000)
+        pendingTechChange.input.dispatchEvent(new Event('blur'));
+
+        // 🚀 FIX SÉCURITÉ : On relance le moteur sur l'ancienne valeur pour purger la donnée aberrante de la mémoire
+        processGlobalDataChange();
+
         pendingTechChange = null;
     }
 }
@@ -2022,8 +2029,20 @@ function confirmSmartThreshold() {
     document.getElementById('smart-threshold-modal').classList.add('hidden');
 
     if (pendingTechChange) {
+        // 🚀 VOTRE IDÉE (Le Fix Visuel) : On simule la sortie de case pour forcer le formateur à remettre les ":"
+        pendingTechChange.input.dispatchEvent(new Event('blur'));
         applyGlobalTechSync(pendingTechChange.input);
         processGlobalDataChange(); // Lancement manuel de la sauvegarde
+        // 🚀 MISE À JOUR DE LA MÉMOIRE : On dit au Juge que cette nouvelle valeur extrême est désormais la norme
+        // (Pour éviter qu'il ne re-déclenche si on reclique dans la case juste après)
+        if (techInputMemory) {
+            techInputMemory.rawValue = pendingTechChange.input.value;
+            let isTime = pendingTechChange.input.classList.contains('format-mss000');
+            let isFuel = pendingTechChange.input.classList.contains('format-lpt') || pendingTechChange.input.id.includes('fuel-') || pendingTechChange.input.id.includes('cons-');
+            let isLife = pendingTechChange.input.classList.contains('global-tire-life') || pendingTechChange.input.classList.contains('driver-tire-life') || pendingTechChange.input.id.includes('life-');
+            techInputMemory.parsedValue = parseTechValue(pendingTechChange.input.value, isTime, isFuel, isLife);
+        }
+
         pendingTechChange = null;
     }
 }

@@ -1956,10 +1956,9 @@ function handleTechFormChange(e) {
             oldRawValue: techInputMemory.rawValue
         };
 
-        // 🚀 MODIFICATION 2 : Miroir visuel utilisant VOTRE fonction formatTime
-        // (On divise newVal par 1000 car formatTime attend des secondes)
-        document.getElementById('modal-old-val').innerText = isTime ? formatTime(oldVal / 1000) : formatValueForModal(oldVal, false, isFuel, isLife);
-        document.getElementById('modal-new-val').innerText = isTime ? formatTime(newVal / 1000) : formatValueForModal(newVal, false, isFuel, isLife);
+        // 🚀 FIX : Utilisation du traducteur dédié MM:SS.sss
+        document.getElementById('modal-old-val').innerText = formatValueForModal(oldVal, isTime, isFuel, isLife);
+        document.getElementById('modal-new-val').innerText = formatValueForModal(newVal, isTime, isFuel, isLife);
 
         openSmartThresholdModal();
     } else {
@@ -2042,11 +2041,26 @@ function confirmSmartThreshold() {
 }
 function formatValueForModal(val, isTime, isFuel, isLife) {
     if (isTime) {
-        // Vos chronos sont stockés en ms dans le Juge, formatTime attend des secondes
-        return formatTime(val / 1000);
+        // 🚀 On reproduit exactement la logique de vos champs .format-mss000
+        let totalMs = Math.round(val);
+        let m = Math.floor(totalMs / 60000);
+        let s = Math.floor((totalMs % 60000) / 1000);
+        let ms = totalMs % 1000;
+
+        // Formatage MM:SS.sss (ex: 02:03.000)
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
     }
-    if (isFuel) return val.toFixed(2) + " L/t";
-    if (isLife) return val + " Tours";
+
+    if (isFuel) {
+        // 🚀 On reproduit la logique .format-lpt (2 décimales + unité)
+        return val.toFixed(2) + " L/t";
+    }
+
+    if (isLife) {
+        // 🚀 On reproduit la logique des tours
+        return val + " Tours";
+    }
+
     return val;
 }
 

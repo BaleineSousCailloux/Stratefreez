@@ -5896,9 +5896,9 @@ function openFlashInput() {
     // 🚀 VERROU A : Bloque le bouton chez tous les ingénieurs pendant 45s
     let lockExpiry = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0) + 45000;
 
-    db.collection('races').doc(currentRaceId).set({
+    db.collection('races').doc(currentRaceId).update({
         flashLockUntil: lockExpiry
-    }, { merge: true }).catch(err => console.error("Erreur Verrou Flash:", err));
+    }).catch(err => { /* On étouffe l'erreur silencieusement si la course n'existe pas */ });
 }
 
 function closeFlashInput() {
@@ -5907,9 +5907,9 @@ function closeFlashInput() {
     if (!currentRaceId || !isEngineerMode) return;
 
     // 🚀 VERROU B1 : Annule le blocage instantanément (Timer à 0)
-    db.collection('races').doc(currentRaceId).set({
+    db.collection('races').doc(currentRaceId).update({
         flashLockUntil: 0
-    }, { merge: true }).catch(err => console.error("Erreur Déverrouillage Flash:", err));
+    }).catch(err => { });
 }
 
 function sendFlashMessage() {
@@ -5924,13 +5924,13 @@ function sendFlashMessage() {
     // VERROU B2 & ENVOI CIBLÉ : Écrit UNIQUEMENT dans la course en cours + Relance 45s
     let lockExpiry = Date.now() + (typeof serverOffset !== 'undefined' ? serverOffset : 0) + 45000;
 
-    db.collection('races').doc(currentRaceId).set({
+    db.collection('races').doc(currentRaceId).update({
         flashLockUntil: lockExpiry,
         flashMessage: {
             text: msg,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         }
-    }, { merge: true }).catch(err => console.error("Erreur Envoi Flash:", err));
+    }).catch(err => console.error("Erreur Envoi Flash:", err));
 
     if (inputEl) inputEl.value = ""; // Nettoyage
 }
